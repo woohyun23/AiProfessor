@@ -1,0 +1,79 @@
+name: 기능 및 작업
+description: 기능, 리팩터링, 인프라 작업을 계획합니다.
+title: "[Feat] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        하나의 이슈는 가능하면 0.5~2일 안에 완료할 수 있는 크기로 작성합니다.
+
+  - type: input
+    id: requirement
+    attributes:
+      label: 관련 요구사항
+      description: 연결되는 요구사항 ID 또는 문서 링크를 작성해 주세요.
+      placeholder: 예) AUTH-001, DOC-002
+
+  - type: textarea
+    id: objective
+    attributes:
+      label: 작업 목적
+      description: 해결하려는 문제와 이 작업이 필요한 이유를 작성해 주세요.
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: 포함 범위
+      description: 이번 이슈에서 구현할 항목을 체크리스트로 작성해 주세요.
+      placeholder: |
+        - [ ] 요청 DTO 작성
+        - [ ] 애플리케이션 서비스 구현
+        - [ ] 통합 테스트 작성
+    validations:
+      required: true
+
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: 제외 범위
+      description: 후속 이슈로 분리하거나 이번 작업에서 다루지 않을 내용을 작성해 주세요.
+      placeholder: 예) 이메일 인증과 비밀번호 찾기는 MVP 이후 진행
+
+  - type: textarea
+    id: acceptance_criteria
+    attributes:
+      label: 완료 조건
+      description: 구현 여부를 객관적으로 판단할 수 있는 조건을 작성해 주세요.
+      placeholder: |
+        - [ ] 정상 요청이 기대한 상태 코드와 응답을 반환한다.
+        - [ ] 중복 또는 잘못된 요청이 정의된 오류코드를 반환한다.
+        - [ ] 관련 테스트가 CI에서 통과한다.
+    validations:
+      required: true
+
+  - type: textarea
+    id: verification
+    attributes:
+      label: 검증 방법
+      description: 테스트, 로그, 화면 또는 측정 결과 등 완료 증거를 작성해 주세요.
+      placeholder: 예) Testcontainers 통합 테스트와 API 응답 캡처
+    validations:
+      required: true
+
+  - type: textarea
+    id: notes
+    attributes:
+      label: 참고 사항
+      description: 관련 ADR, API 명세, 테이블 명세 또는 기술적 주의사항을 작성해 주세요.
+
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: 작업 전 확인
+      options:
+        - label: 기존 이슈와 중복되지 않는지 확인했습니다.
+          required: true
+        - label: 하나의 논리적 변경으로 리뷰 가능한 크기인지 확인했습니다.
+          required: true
