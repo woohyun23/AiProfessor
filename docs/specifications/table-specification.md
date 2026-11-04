@@ -2,7 +2,7 @@
 
 - 문서 버전: v0.1 (초안)
 - 작성일: 2026-11-02
-- 기준 문서: `AiProfessor MVP 요구사항 명세서 v0.1`
+- 기준 문서: `AiProfessor MVP 요구사항 명세서 v0.1`, `인증 및 토큰 정책 v0.1`
 - 용도: Notion 붙여넣기 및 ERD·DDL 설계 기준
 
 ## 1. 설계 전제
@@ -94,12 +94,12 @@ Refresh Token 원문 대신 해시를 저장하고 토큰 회전과 로그아웃
 |---|---|---:|---|---|---|
 | `id` | UUID | N | `gen_random_uuid()` | PK | 토큰 레코드 ID |
 | `user_id` | UUID | N | - | FK | `users.id` |
-| `token_hash` | VARCHAR(255) | N | - | UK | Refresh Token 해시 |
+| `token_hash` | CHAR(64) | N | - | UK | Refresh Token 원문의 SHA-256 소문자 16진수 해시 |
 | `token_family_id` | UUID | N | - | INDEX | 회전 토큰 묶음 ID |
 | `expires_at` | TIMESTAMPTZ | N | - | INDEX | 만료 시각 |
 | `revoked_at` | TIMESTAMPTZ | Y | - | - | 폐기 시각 |
 | `replaced_by_token_id` | UUID | Y | - | FK | 새로 발급된 `refresh_tokens.id` |
-| `created_ip_hash` | VARCHAR(128) | Y | - | - | 비식별화한 발급 IP |
+| `created_ip_hash` | CHAR(64) | Y | - | - | 서버 비밀값을 사용한 발급 IP의 HMAC-SHA-256 소문자 16진수 해시 |
 | `user_agent` | VARCHAR(500) | Y | - | - | 발급 클라이언트 정보 |
 | `created_at` | TIMESTAMPTZ | N | `now()` | - | 발급 시각 |
 
@@ -107,6 +107,8 @@ Refresh Token 원문 대신 해시를 저장하고 토큰 회전과 로그아웃
 
 - `UK refresh_tokens(token_hash)`
 - `INDEX refresh_tokens(user_id, revoked_at, expires_at)`
+- `INDEX refresh_tokens(token_family_id, revoked_at)`
+- 토큰 갱신 시 `token_hash`로 레코드를 조회하고 행 잠금 또는 동등한 원자적 갱신으로 중복 성공을 막는다.
 - 사용자 탈퇴 또는 전체 로그아웃 시 해당 사용자의 활성 토큰을 모두 폐기한다.
 
 ## 4.3 `documents`

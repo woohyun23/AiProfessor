@@ -109,9 +109,9 @@ AI_0002
 | 담당자 | 도메인 | 기능 | Method | url | Param | 접근 권한 | 권한 여부 | 설명 | 비고 |
 |---|---|---|---|---|---|---|---|---|---|
 | 박우현 | User | 회원가입 | POST | `/api/v1/users` | Body | 비회원 | N | 이메일, 비밀번호, 이름을 입력받아 신규 사용자 계정을 생성한다. | 이메일 중복 검증 |
-| 박우현 | Auth | 로그인 | POST | `/api/v1/auth/login` | Body | 비회원 | N | 이메일과 비밀번호를 검증하고 Access Token과 Refresh Token을 발급한다. | 토큰 전달 방식 추후 확정 |
-| 박우현 | Auth | 토큰 재발급 | POST | `/api/v1/auth/refresh` | Body | 비회원 | N | Refresh Token을 검증·회전하고 새 토큰을 발급한다. | 재사용 탐지 시 토큰 패밀리 폐기 |
-| 박우현 | Auth | 로그아웃 | POST | `/api/v1/auth/logout` | Body | 일반 이용자 | Y | 현재 Refresh Token을 폐기한다. | Access Token은 만료까지 유효 |
+| 박우현 | Auth | 로그인 | POST | `/api/v1/auth/login` | Body | 비회원 | N | 이메일과 비밀번호를 검증하고 Access Token과 Refresh Token을 발급한다. | Access Token은 본문, Refresh Token은 HttpOnly Cookie로 전달 |
+| 박우현 | Auth | 토큰 재발급 | POST | `/api/v1/auth/refresh` | Cookie | 비회원 | N | Refresh Token Cookie를 검증·회전하고 새 Access Token을 발급한다. | 회전된 Refresh Token은 Cookie로 전달, 재사용 탐지 시 토큰 패밀리 폐기 |
+| 박우현 | Auth | 로그아웃 | POST | `/api/v1/auth/logout` | Header, Cookie | 일반 이용자 | Y | 현재 Refresh Token을 폐기하고 Cookie를 만료시킨다. | Access Token은 최대 30분까지 유효 가능 |
 | 박우현 | User | 내 정보 조회 | GET | `/api/v1/users/me` | - | 일반 이용자 | Y | 로그인한 사용자의 계정 정보를 조회한다. |  |
 | 박우현 | User | 내 정보 수정 | PATCH | `/api/v1/users/me` | Body | 일반 이용자 | Y | 로그인한 사용자의 표시 이름을 변경한다. |  |
 | 박우현 | User | 회원 탈퇴 | DELETE | `/api/v1/users/me` | Body | 일반 이용자 | Y | 계정을 탈퇴 처리하고 모든 문서와 파생 데이터 삭제 작업을 접수한다. | 비동기 삭제, `202` |
