@@ -2,7 +2,7 @@
 
 - 문서 버전: v0.1 (초안)
 - 작성일: 2026-11-02
-- 기준 문서: `AiProfessor MVP 요구사항 명세서 v0.1`, `테이블 명세서 v0.1`
+- 기준 문서: `AiProfessor MVP 요구사항 명세서 v0.1`, `테이블 명세서 v0.1`, `인증 및 토큰 정책 v0.1`
 - Base URL: `/api/v1`
 - 용도: Notion 붙여넣기 및 OpenAPI 작성 기준
 
@@ -145,7 +145,7 @@
 | 필드 | 규칙 |
 |---|---|
 | `email` | 필수, 이메일 형식, 최대 320자, 소문자 정규화 |
-| `password` | 필수, 최소 8자, 최대 길이는 보안 정책에서 확정 |
+| `password` | 필수, 8~64자, BCrypt 입력 제한을 넘는 UTF-8 바이트 길이 거부 |
 | `displayName` | 필수, 2~50자 |
 
 성공: `201 Created`
@@ -163,8 +163,8 @@
 
 오류:
 
-- `409 EMAIL_ALREADY_EXISTS`
-- `400 VALIDATION_FAILED`
+- `409 USER_0001` (`EMAIL_ALREADY_EXISTS`)
+- `400 COMMON_0001` (`VALIDATION_FAILED`)
 
 ## 5.2 로그인
 
@@ -183,13 +183,20 @@
 
 성공: `200 OK`
 
+응답 헤더:
+
+```http
+Set-Cookie: refresh_token=rft_...; HttpOnly; Secure; SameSite=Lax; Path=/api/v1/auth; Max-Age=1209600
+```
+
+> 로컬 HTTP 개발 프로필에서만 `Secure`를 제외한다. Refresh Token 원문은 응답 본문에 포함하지 않는다.
+
 ```json
 {
   "data": {
     "accessToken": "eyJ...",
     "tokenType": "Bearer",
     "expiresIn": 1800,
-    "refreshToken": "rft_...",
     "user": {
       "userId": "0a68688f-013d-4622-8cba-e3e7d31316df",
       "email": "learner@example.com",
@@ -202,8 +209,8 @@
 
 오류:
 
-- `401 INVALID_CREDENTIALS`
-- `401 ACCOUNT_LOCKED`
+- `401 AUTH_0001` (`INVALID_CREDENTIALS`)
+- `401 AUTH_0007` (`ACCOUNT_LOCKED`)
 
 > 이메일 존재 여부가 추측되지 않도록 이메일 오류와 비밀번호 오류를 같은 코드로 응답한다.
 
@@ -211,25 +218,30 @@
 
 `POST /auth/refresh`
 
-인증: 불필요, Refresh Token 필요
+인증: Access Token 불필요, `refresh_token` Cookie 필요
 
 요청:
 
-```json
-{
-  "refreshToken": "rft_..."
-}
+```http
+Cookie: refresh_token=rft_...
 ```
 
 성공: `200 OK`
+
+응답 헤더:
+
+```http
+Set-Cookie: refresh_token=rft_new...; HttpOnly; Secure; SameSite=Lax; Path=/api/v1/auth; Max-Age=1209600
+```
+
+> 갱신할 때 Refresh Token Cookie를 회전하며 원문은 응답 본문에 포함하지 않는다.
 
 ```json
 {
   "data": {
     "accessToken": "eyJ...new",
     "tokenType": "Bearer",
-    "expiresIn": 1800,
-    "refreshToken": "rft_new..."
+    "expiresIn": 1800
   }
 }
 ```
@@ -241,25 +253,32 @@
 
 오류:
 
-- `401 INVALID_REFRESH_TOKEN`
-- `401 REFRESH_TOKEN_EXPIRED`
-- `401 REFRESH_TOKEN_REUSED`
+- `401 AUTH_0004` (`INVALID_REFRESH_TOKEN`)
+- `401 AUTH_0005` (`REFRESH_TOKEN_EXPIRED`)
+- `401 AUTH_0006` (`REFRESH_TOKEN_REUSED`)
 
 ## 5.4 로그아웃
 
 `POST /auth/logout`
 
-인증: 필요
+인증: Access Token과 `refresh_token` Cookie 필요
 
 요청:
 
-```json
-{
-  "refreshToken": "rft_..."
-}
+```http
+Authorization: Bearer eyJ...
+Cookie: refresh_token=rft_...
 ```
 
 성공: `204 No Content`
+
+응답 헤더:
+
+```http
+Set-Cookie: refresh_token=; HttpOnly; Secure; SameSite=Lax; Path=/api/v1/auth; Max-Age=0
+```
+
+> 로그아웃은 현재 Refresh Token을 폐기하고 Cookie를 만료시킨다. Access Token은 최대 30분의 자체 만료 시각까지 유효할 수 있다.
 
 ## 6. 문서 API
 
@@ -1081,14 +1100,18 @@ Form Data:
 
 | 코드 | HTTP | 설명 |
 |---|---:|---|
-| `INVALID_CREDENTIALS` | 401 | 이메일 또는 비밀번호 불일치 |
-| `ACCESS_TOKEN_EXPIRED` | 401 | Access Token 만료 |
-| `INVALID_ACCESS_TOKEN` | 401 | 유효하지 않은 Access Token |
-| `INVALID_REFRESH_TOKEN` | 401 | 유효하지 않은 Refresh Token |
-| `REFRESH_TOKEN_EXPIRED` | 401 | Refresh Token 만료 |
-| `REFRESH_TOKEN_REUSED` | 401 | 이미 회전·폐기된 토큰 재사용 |
-| `EMAIL_ALREADY_EXISTS` | 409 | 가입된 이메일 |
-| `ACCOUNT_LOCKED` | 401 | 잠긴 계정 |
+| `AUTH_0001` | 401 | 이메일 또는 비밀번호 불일치 |
+| `AUTH_0002` | 401 | 유효하지 않은 Access Token |
+| `AUTH_0003` | 401 | Access Token 만료 |
+| `AUTH_0004` | 401 | 유효하지 않은 Refresh Token |
+| `AUTH_0005` | 401 | Refresh Token 만료 |
+| `AUTH_0006` | 401 | 이미 회전·폐기된 Refresh Token 재사용 |
+| `AUTH_0007` | 401 | 잠긴 계정 |
+| `AUTH_0008` | 401 | 인증이 필요한 요청 |
+| `USER_0001` | 409 | 이미 가입된 이메일 |
+| `USER_0002` | 401 | 탈퇴한 계정 |
+| `USER_0003` | 400 | 현재 비밀번호 불일치 |
+| `USER_0004` | 400 | 기존 비밀번호와 같은 새 비밀번호 |
 
 ### 14.2 문서·작업
 
@@ -1161,8 +1184,6 @@ Form Data:
 
 ## 17. 구현 전 확정 항목
 
-- Refresh Token을 응답 본문으로 전달할지 HttpOnly Secure Cookie로 전달할지
-- Access Token과 Refresh Token 만료 시간
 - PDF 서명 URL 유효 시간과 다운로드 허용 정책
 - 중복 문서를 오류로 막을지 기존 문서 안내 후 재사용하게 할지
 - 문제 풀이 전에 근거 페이지를 노출할지 여부

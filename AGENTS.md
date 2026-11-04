@@ -36,6 +36,8 @@ The backend uses Java 21, Spring Boot, PostgreSQL, pgvector, Flyway, AWS S3, and
 
 ## Code Review Rules
 
+- Write pull request review comments and review summaries in Korean.
+
 ### User data ownership
 
 - User-owned resources must be queried and modified with the authenticated user ID.
