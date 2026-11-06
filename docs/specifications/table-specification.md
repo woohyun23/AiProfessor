@@ -67,18 +67,18 @@
 
 사용자 계정과 권한·상태를 저장한다.
 
-| 컬럼명 | 타입 | NULL | 기본값 | 키·제약 | 설명 |
-|---|---|---:|---|---|---|
-| `id` | UUID | N | `gen_random_uuid()` | PK | 사용자 ID |
+| 컬럼명 | 타입           | NULL | 기본값 | 키·제약 | 설명 |
+|---|--------------|---:|---|---|---|
+| `id` | UUID         | N | `gen_random_uuid()` | PK | 사용자 ID |
 | `email` | VARCHAR(320) | N | - | UK | 소문자로 정규화한 이메일 |
 | `password_hash` | VARCHAR(255) | N | - | - | 검증된 해시 알고리즘으로 생성한 비밀번호 해시 |
-| `display_name` | VARCHAR(50) | N | - | - | 화면 표시 이름 |
-| `role` | VARCHAR(20) | N | `USER` | CHECK | `USER`, `ADMIN` |
-| `status` | VARCHAR(20) | N | `ACTIVE` | CHECK | `ACTIVE`, `LOCKED`, `WITHDRAWN` |
-| `last_login_at` | TIMESTAMPTZ | Y | - | - | 마지막 로그인 시각 |
-| `withdrawn_at` | TIMESTAMPTZ | Y | - | - | 탈퇴 요청 시각 |
-| `created_at` | TIMESTAMPTZ | N | `now()` | - | 생성 시각 |
-| `updated_at` | TIMESTAMPTZ | N | `now()` | - | 변경 시각 |
+| `display_name` | VARCHAR(10)  | N | - | - | 화면 표시 이름 |
+| `role` | VARCHAR(20)  | N | `USER` | CHECK | `USER`, `ADMIN` |
+| `status` | VARCHAR(20)  | N | `ACTIVE` | CHECK | `ACTIVE`, `LOCKED`, `WITHDRAWN` |
+| `last_login_at` | TIMESTAMPTZ  | Y | - | - | 마지막 로그인 시각 |
+| `withdrawn_at` | TIMESTAMPTZ  | Y | - | - | 탈퇴 요청 시각 |
+| `created_at` | TIMESTAMPTZ  | N | `now()` | - | 생성 시각 |
+| `updated_at` | TIMESTAMPTZ  | N | `now()` | - | 변경 시각 |
 
 인덱스·제약:
 

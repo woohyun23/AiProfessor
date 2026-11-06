@@ -3,7 +3,7 @@ CREATE TABLE users
     id            UUID         NOT NULL DEFAULT gen_random_uuid(),
     email         VARCHAR(320) NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
-    display_name  VARCHAR(50)  NOT NULL,
+    display_name  VARCHAR(10)  NOT NULL,
     role          VARCHAR(20)  NOT NULL DEFAULT 'USER',
     status        VARCHAR(20)  NOT NULL DEFAULT 'ACTIVE',
     last_login_at TIMESTAMPTZ,
@@ -21,7 +21,7 @@ CREATE TABLE users
         CHECK (email = LOWER(BTRIM(email))),
 
     CONSTRAINT chk_users_display_name_length
-        CHECK (CHAR_LENGTH(display_name) BETWEEN 2 AND 50),
+        CHECK (CHAR_LENGTH(display_name) BETWEEN 2 AND 10),
 
     CONSTRAINT chk_users_role
         CHECK (role IN ('USER', 'ADMIN')),
