@@ -1,3 +1,13 @@
 spring:
   application:
     name: backend
+
+aiprofessor:
+  auth:
+    token:
+      issuer: aiprofessor
+      audience: aiprofessor-api
+      key-id: ${JWT_KEY_ID:local-dev-v1}
+      access-token-ttl: 30m
+      refresh-token-ttl: 14d
+      refresh-token-bytes: 32
