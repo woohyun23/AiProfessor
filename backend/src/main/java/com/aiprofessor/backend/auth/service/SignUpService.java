@@ -9,6 +9,7 @@ import com.aiprofessor.backend.auth.repository.UserRepository;
 import com.aiprofessor.backend.support.error.ApiException;
 import com.aiprofessor.backend.support.error.CommonErrorCode;
 import lombok.RequiredArgsConstructor;
+import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,7 @@ import java.nio.charset.StandardCharsets;
 public class SignUpService {
 
     private static final int BCRYPT_MAX_BYTES = 72;
+    private static final String EMAIL_UNIQUE_CONSTRAINT = "uk_users_email";
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -47,7 +49,11 @@ public class SignUpService {
 
             return SignUpResponse.from(savedUser);
         } catch (DataIntegrityViolationException exception) {
-            throw new ApiException(UserErrorCode.EMAIL_ALREADY_EXISTS);
+            if (isEmailUniqueConstraintViolation(exception)) {
+                throw new ApiException(UserErrorCode.EMAIL_ALREADY_EXISTS);
+            }
+
+            throw exception;
         }
     }
 
@@ -68,4 +74,17 @@ public class SignUpService {
         }
     }
 
+    private boolean isEmailUniqueConstraintViolation(Throwable exception) {
+        Throwable cause = exception;
+
+        while (cause != null) {
+            if (cause instanceof ConstraintViolationException violation) {
+                return EMAIL_UNIQUE_CONSTRAINT.equals(violation.getConstraintName());
+            }
+
+            cause = cause.getCause();
+        }
+
+        return false;
+    }
 }

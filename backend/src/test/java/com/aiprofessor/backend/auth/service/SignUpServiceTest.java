@@ -18,6 +18,8 @@ import com.aiprofessor.backend.auth.error.UserErrorCode;
 import com.aiprofessor.backend.auth.repository.UserRepository;
 import com.aiprofessor.backend.support.error.ApiException;
 import com.aiprofessor.backend.support.error.CommonErrorCode;
+import java.sql.SQLException;
+import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -104,9 +106,18 @@ class SignUpServiceTest {
                 "password123",
                 "학습자"
         );
+        ConstraintViolationException constraintViolation =
+                new ConstraintViolationException(
+                        "could not execute statement",
+                        new SQLException("duplicate email"),
+                        "uk_users_email"
+                );
         given(userRepository.saveAndFlush(any(User.class)))
                 .willThrow(
-                        new DataIntegrityViolationException("duplicate email")
+                        new DataIntegrityViolationException(
+                                "duplicate email",
+                                constraintViolation
+                        )
                 );
 
         assertThatThrownBy(() -> signUpService.signUp(request))
@@ -114,6 +125,31 @@ class SignUpServiceTest {
                         assertThat(exception.getErrorCode())
                                 .isEqualTo(UserErrorCode.EMAIL_ALREADY_EXISTS)
                 );
+    }
+
+    @Test
+    void 이메일이_아닌_무결성_오류는_그대로_전파한다() {
+        SignUpRequest request = new SignUpRequest(
+                "learner@example.com",
+                "password123",
+                "학습자"
+        );
+        ConstraintViolationException constraintViolation =
+                new ConstraintViolationException(
+                        "could not execute statement",
+                        new SQLException("invalid display name"),
+                        "chk_users_display_name_length"
+                );
+        DataIntegrityViolationException databaseException =
+                new DataIntegrityViolationException(
+                        "invalid display name",
+                        constraintViolation
+                );
+        given(userRepository.saveAndFlush(any(User.class)))
+                .willThrow(databaseException);
+
+        assertThatThrownBy(() -> signUpService.signUp(request))
+                .isSameAs(databaseException);
     }
 
     @Test
