@@ -19,11 +19,11 @@ public record AuthTokenProperties(
         @Min(32) int refreshTokenBytes
 ) {
     public AuthTokenProperties{
-        if (accessTokenTtl != null && accessTokenTtl.isNegative()) {
+        if (accessTokenTtl != null && (accessTokenTtl.isZero() || accessTokenTtl.isNegative())) {
             throw new IllegalArgumentException("accessTokenTtl must be positive");
         }
 
-        if (refreshTokenTtl != null && refreshTokenTtl.isNegative()) {
+        if (refreshTokenTtl != null && (refreshTokenTtl.isZero() || refreshTokenTtl.isNegative())) {
             throw new IllegalArgumentException("refreshTokenTtl must be positive");
         }
     }
