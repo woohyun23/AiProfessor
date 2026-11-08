@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 
 import java.time.Instant;
+import java.util.Objects;
 import java.util.UUID;
 
 @Entity
@@ -53,5 +54,9 @@ public class User extends BaseEntity {
         user.status = UserStatus.ACTIVE;
 
         return user;
+    }
+
+    public void  recordLogin(Instant LoginAt) {
+        this.lastLoginAt = Objects.requireNonNull(LoginAt, "LoginAt must not be null");
     }
 }
