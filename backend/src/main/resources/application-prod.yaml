@@ -1,0 +1,6 @@
+aiprofessor:
+  auth:
+    ip-hash-secret: ${AUTH_IP_HASH_SECRET}
+    token:
+      private-key-location: ${JWT_PRIVATE_KEY_LOCATION}
+      public-key-location: ${JWT_PUBLIC_KEY_LOCATION}

@@ -1,3 +1,16 @@
 spring:
   application:
     name: backend
+  profiles:
+    default: local
+
+aiprofessor:
+  auth:
+    ip-hash-secret: ${AUTH_IP_HASH_SECRET:local-development-ip-hash-secret-change-me}
+    token:
+      issuer: aiprofessor
+      audience: aiprofessor-api
+      key-id: ${JWT_KEY_ID:local-dev-v1}
+      access-token-ttl: 30m
+      refresh-token-ttl: 14d
+      refresh-token-bytes: 32
