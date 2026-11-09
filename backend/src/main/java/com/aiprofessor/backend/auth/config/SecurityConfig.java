@@ -11,12 +11,16 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
 
     private static final String SIGN_UP_PATH = "/api/v1/users";
+    private static final String LOGIN_PATH = "/api/v1/auth/login";
 
     @Bean
     public SecurityFilterChain securityFilterChain (HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf
-                        .ignoringRequestMatchers(SIGN_UP_PATH)
+                        .ignoringRequestMatchers(
+                                SIGN_UP_PATH,
+                                LOGIN_PATH
+                        )
                 )
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(
@@ -26,7 +30,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(
                                 HttpMethod.POST,
-                                SIGN_UP_PATH
+                                SIGN_UP_PATH,
+                                LOGIN_PATH
                         )
                         .permitAll()
                         .requestMatchers("/actuator/health")

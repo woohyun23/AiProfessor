@@ -6,6 +6,7 @@ spring:
 
 aiprofessor:
   auth:
+    ip-hash-secret: ${AUTH_IP_HASH_SECRET:local-development-ip-hash-secret-change-me}
     token:
       issuer: aiprofessor
       audience: aiprofessor-api
