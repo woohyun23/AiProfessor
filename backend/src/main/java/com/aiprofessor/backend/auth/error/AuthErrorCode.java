@@ -6,7 +6,7 @@ import org.springframework.http.HttpStatus;
 public enum AuthErrorCode implements ErrorCode {
 
     INVALID_CREDENTIALS("AUTH_0001", "이메일 또는 비밀번호가 일치하지 않습니다.", HttpStatus.UNAUTHORIZED),
-    ACCOUNT_LOCKED("AUTH_0002", "잠금 처리된 계정입니다.", HttpStatus.UNAUTHORIZED);
+    ACCOUNT_LOCKED("AUTH_0007", "잠금 처리된 계정입니다.", HttpStatus.UNAUTHORIZED);
 
     private final String code;
     private final String message;

@@ -5,8 +5,8 @@ import com.aiprofessor.backend.auth.token.IssuedAccessToken;
 
 public record LoginResponse(
         String accessToken,
-        String TokenType,
-        long ExpiresIn,
+        String tokenType,
+        long expiresIn,
         LoginUserResponse user
 ) {
 

@@ -56,7 +56,7 @@ public class User extends BaseEntity {
         return user;
     }
 
-    public void  recordLogin(Instant LoginAt) {
+    public void recordLogin(Instant LoginAt) {
         this.lastLoginAt = Objects.requireNonNull(LoginAt, "LoginAt must not be null");
     }
 }
