@@ -21,13 +21,15 @@ import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.time.Clock;
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 
 @Configuration(proxyBeanMethods = false)
 public class JwtKeyConfig {
 
     private static final int RSA_KEY_SIZE = 2048;
-    private static final Duration MAX_CLOCK_SKEW = Duration.ofMinutes(60);
+    private static final Duration MAX_CLOCK_SKEW = Duration.ofSeconds(60);
 
     @Bean
     // JWT 공통 설정
@@ -64,6 +66,18 @@ public class JwtKeyConfig {
                 .withPublicKey(publicKey)
                 .signatureAlgorithm(SignatureAlgorithm.RS256)
                 .build();
+
+        MappedJwtClaimSetConverter defaultClaimConverter = MappedJwtClaimSetConverter.withDefaults(Map.of());
+        jwtDecoder.setClaimSetConverter(claims -> {
+            boolean issuedAtExists = claims.containsKey("iat");
+            Map<String, Object> convertedClaims = new HashMap<>(defaultClaimConverter.convert(claims));
+
+            if (!issuedAtExists) {
+                convertedClaims.remove("iat");
+            }
+
+            return convertedClaims;
+        });
 
         JwtTimestampValidator timestampValidator = new JwtTimestampValidator(MAX_CLOCK_SKEW);
 

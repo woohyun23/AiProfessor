@@ -15,7 +15,7 @@ import java.util.UUID;
 
 public class AccessTokenClaimsValidator implements OAuth2TokenValidator<Jwt> {
 
-    private static final String INVALID_TOKEN_ERROR = "Invalid token";
+    private static final String INVALID_TOKEN_ERROR = "invalid_token";
     private static final String ACCESS_TOKEN_TYPE = "access";
     private static final Set<String> ALLOWED_ROLES = Set.of(UserRole.USER.name(), UserRole.ADMIN.name());
 
