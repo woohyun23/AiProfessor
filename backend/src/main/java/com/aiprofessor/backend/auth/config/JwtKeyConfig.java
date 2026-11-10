@@ -1,14 +1,16 @@
 package com.aiprofessor.backend.auth.config;
 
+import com.aiprofessor.backend.auth.security.AccessTokenClaimsValidator;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 import org.springframework.core.io.Resource;
 import org.springframework.security.converter.RsaKeyConverters;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
-import org.springframework.security.oauth2.jwt.JwtEncoder;
-import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
+import org.springframework.security.oauth2.jwt.*;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -17,12 +19,15 @@ import java.security.KeyPairGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.time.Clock;
+import java.time.Duration;
 import java.util.Objects;
 
 @Configuration(proxyBeanMethods = false)
 public class JwtKeyConfig {
 
     private static final int RSA_KEY_SIZE = 2048;
+    private static final Duration MAX_CLOCK_SKEW = Duration.ofMinutes(60);
 
     @Bean
     // JWT 공통 설정
@@ -43,6 +48,38 @@ public class JwtKeyConfig {
                 // 사용할 키의 식별자 지정
                 .jwkPostProcessor(builder -> builder.keyID(authTokenProperties.keyId())
                 ).build();
+    }
+
+    @Bean
+    // JWT 문자열 입력 -> RS256 공개 키 서명 검증 -> exp 검증 및 60초 시계 오차 적용 -> iss 검증 -> aud 검증
+    // -> typ·sub·role·jti·iat 검증 -> 검증된 Jwt 반환
+    public JwtDecoder jwtDecoder(
+            KeyPair jwtSigningKeyPair,
+            AuthTokenProperties authTokenProperties,
+            Clock clock
+    ) {
+        RSAPublicKey  publicKey = (RSAPublicKey) jwtSigningKeyPair.getPublic();
+
+        NimbusJwtDecoder jwtDecoder = NimbusJwtDecoder
+                .withPublicKey(publicKey)
+                .signatureAlgorithm(SignatureAlgorithm.RS256)
+                .build();
+
+        JwtTimestampValidator timestampValidator = new JwtTimestampValidator(MAX_CLOCK_SKEW);
+
+        timestampValidator.setClock(clock);
+        timestampValidator.setAllowEmptyExpiryClaim(false);
+
+        OAuth2TokenValidator<Jwt> validator = new DelegatingOAuth2TokenValidator<>(
+                timestampValidator,
+                new JwtIssuerValidator(authTokenProperties.issuer()),
+                new JwtAudienceValidator(authTokenProperties.audience()),
+                new AccessTokenClaimsValidator(clock, MAX_CLOCK_SKEW)
+        );
+
+        jwtDecoder.setJwtValidator(validator);
+
+        return jwtDecoder;
     }
 
     @Configuration(proxyBeanMethods = false)
