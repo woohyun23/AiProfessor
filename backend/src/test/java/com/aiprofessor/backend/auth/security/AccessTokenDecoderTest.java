@@ -197,6 +197,23 @@ class AccessTokenDecoderTest {
     }
 
     @Test
+    void role이_없는_토큰을_표준_invalid_token으로_거부한다() {
+        JwtClaimsSet.Builder claims = validClaimsBuilder()
+                .claims(claimValues ->
+                        claimValues.remove("role")
+                );
+        String token = encode(jwtEncoder, claims);
+
+        assertThatThrownBy(() -> jwtDecoder.decode(token))
+                .isInstanceOfSatisfying(
+                        JwtValidationException.class,
+                        exception -> assertThat(exception.getErrors())
+                                .extracting(OAuth2Error::getErrorCode)
+                                .contains("invalid_token")
+                );
+    }
+
+    @Test
     void UUID가_아닌_jti를_거부한다() {
         String token = encode(
                 jwtEncoder,

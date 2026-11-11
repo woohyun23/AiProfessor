@@ -46,7 +46,7 @@ public class AccessTokenClaimsValidator implements OAuth2TokenValidator<Jwt> {
 
         String role = jwt.getClaimAsString("role");
 
-        if (!ALLOWED_ROLES.contains(role)) {
+        if (role == null || !ALLOWED_ROLES.contains(role)) {
             return failure("Access Token role is invalid");
         }
 
