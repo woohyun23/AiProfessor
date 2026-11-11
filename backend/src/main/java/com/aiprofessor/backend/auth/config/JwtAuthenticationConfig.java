@@ -21,7 +21,7 @@ public class JwtAuthenticationConfig {
 
         JwtAuthenticationConverter authenticationConverter = new JwtAuthenticationConverter();
 
-        // JWT의 sub를 인  증 사용자 이름으로 사용
+        // JWT의 sub를 인증 사용자 이름으로 사용
         authenticationConverter.setPrincipalClaimName(JwtClaimNames.SUB);
         authenticationConverter.setJwtGrantedAuthoritiesConverter(authoritiesConverter);
 
