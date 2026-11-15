@@ -14,10 +14,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.aiprofessor.backend.auth.config.JwtAuthenticationConfig;
 import com.aiprofessor.backend.auth.config.SecurityConfig;
+import com.aiprofessor.backend.auth.domain.User;
+import com.aiprofessor.backend.auth.domain.UserStatus;
+import com.aiprofessor.backend.auth.repository.UserRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -35,6 +39,7 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtValidationException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -46,6 +51,7 @@ import org.springframework.web.bind.annotation.RestController;
         JsonAuthenticationEntryPoint.class,
         JsonAccessDeniedHandler.class,
         SecurityErrorResponseWriter.class,
+        CurrentAccountStatusValidator.class,
         ResourceServerAuthenticationTest.TestController.class
 })
 class ResourceServerAuthenticationTest {
@@ -63,6 +69,9 @@ class ResourceServerAuthenticationTest {
 
     @MockitoBean
     private JwtDecoder jwtDecoder;
+
+    @MockitoBean
+    private UserRepository userRepository;
 
     @Test
     void Access_Token이_없으면_보호_API_요청을_거부한다()
@@ -84,6 +93,7 @@ class ResourceServerAuthenticationTest {
                 ));
 
         verifyNoInteractions(jwtDecoder);
+        verifyNoInteractions(userRepository);
     }
 
     @Test
@@ -113,6 +123,7 @@ class ResourceServerAuthenticationTest {
                 ));
 
         verify(jwtDecoder).decode("invalid-token");
+        verifyNoInteractions(userRepository);
     }
 
     @Test
@@ -150,6 +161,7 @@ class ResourceServerAuthenticationTest {
                 ));
 
         verify(jwtDecoder).decode("expired-token");
+        verifyNoInteractions(userRepository);
     }
 
     @Test
@@ -157,6 +169,8 @@ class ResourceServerAuthenticationTest {
             throws Exception {
         given(jwtDecoder.decode("valid-token"))
                 .willReturn(createJwt("USER"));
+        given(userRepository.findById(USER_ID))
+                .willReturn(Optional.of(createActiveUser()));
 
         mockMvc.perform(get(PROTECTED_PATH)
                         .header(
@@ -173,12 +187,99 @@ class ResourceServerAuthenticationTest {
     }
 
     @Test
-    void 로그인_API는_Access_Token_없이_접근할_수_있다()
+    void 잠긴_계정이면_AUTH_0007을_반환한다()
             throws Exception {
-        mockMvc.perform(post(LOGIN_PATH))
+        given(jwtDecoder.decode("locked-user-token"))
+                .willReturn(createJwt("USER"));
+        given(userRepository.findById(USER_ID))
+                .willReturn(Optional.of(
+                        createUser(UserStatus.LOCKED)
+                ));
+
+        mockMvc.perform(get(PROTECTED_PATH)
+                        .header(
+                                HttpHeaders.AUTHORIZATION,
+                                "Bearer locked-user-token"
+                        ))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(
+                        MediaType.APPLICATION_JSON
+                ))
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.errorCode")
+                        .value("AUTH_0007"))
+                .andExpect(jsonPath("$.message")
+                        .value("잠금 처리된 계정입니다."))
+                .andExpect(jsonPath("$.errors").isEmpty());
+    }
+
+    @Test
+    void 탈퇴한_계정이면_USER_0002를_반환한다()
+            throws Exception {
+        given(jwtDecoder.decode("withdrawn-user-token"))
+                .willReturn(createJwt("USER"));
+        given(userRepository.findById(USER_ID))
+                .willReturn(Optional.of(
+                        createUser(UserStatus.WITHDRAWN)
+                ));
+
+        mockMvc.perform(get(PROTECTED_PATH)
+                        .header(
+                                HttpHeaders.AUTHORIZATION,
+                                "Bearer withdrawn-user-token"
+                        ))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(
+                        MediaType.APPLICATION_JSON
+                ))
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.errorCode")
+                        .value("USER_0002"))
+                .andExpect(jsonPath("$.message")
+                        .value("탈퇴 처리된 계정입니다."))
+                .andExpect(jsonPath("$.errors").isEmpty());
+    }
+
+    @Test
+    void 토큰의_사용자가_존재하지_않으면_AUTH_0002를_반환한다()
+            throws Exception {
+        given(jwtDecoder.decode("missing-user-token"))
+                .willReturn(createJwt("USER"));
+        given(userRepository.findById(USER_ID))
+                .willReturn(Optional.empty());
+
+        mockMvc.perform(get(PROTECTED_PATH)
+                        .header(
+                                HttpHeaders.AUTHORIZATION,
+                                "Bearer missing-user-token"
+                        ))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(
+                        MediaType.APPLICATION_JSON
+                ))
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.errorCode")
+                        .value("AUTH_0002"))
+                .andExpect(jsonPath("$.message")
+                        .value("유효하지 않은 Access Token입니다."))
+                .andExpect(jsonPath("$.errors").isEmpty());
+    }
+
+    @Test
+    void 로그인_API는_Access_Token이_있어도_계정_상태를_조회하지_않는다()
+            throws Exception {
+        given(jwtDecoder.decode("public-api-token"))
+                .willReturn(createJwt("USER"));
+
+        mockMvc.perform(post(LOGIN_PATH)
+                        .header(
+                                HttpHeaders.AUTHORIZATION,
+                                "Bearer public-api-token"
+                        ))
                 .andExpect(status().isNoContent());
 
-        verifyNoInteractions(jwtDecoder);
+        verify(jwtDecoder).decode("public-api-token");
+        verifyNoInteractions(userRepository);
     }
 
     private Jwt createJwt(String role) {
@@ -196,6 +297,21 @@ class ResourceServerAuthenticationTest {
                 .issuedAt(ISSUED_AT)
                 .expiresAt(ISSUED_AT.plus(Duration.ofMinutes(30)))
                 .build();
+    }
+
+    private User createActiveUser() {
+        return createUser(UserStatus.ACTIVE);
+    }
+
+    private User createUser(UserStatus status) {
+        User user = User.create(
+                "learner@example.com",
+                "{bcrypt}password-hash",
+                "학습자"
+        );
+        ReflectionTestUtils.setField(user, "status", status);
+
+        return user;
     }
 
     @RestController
