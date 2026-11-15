@@ -1,5 +1,7 @@
 package com.aiprofessor.backend.auth.config;
 
+import com.aiprofessor.backend.auth.security.JsonAccessDeniedHandler;
+import com.aiprofessor.backend.auth.security.JsonAuthenticationEntryPoint;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -18,7 +20,9 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
-            JwtAuthenticationConverter jwtAuthenticationConverter
+            JwtAuthenticationConverter jwtAuthenticationConverter,
+            JsonAuthenticationEntryPoint authenticationEntryPoint,
+            JsonAccessDeniedHandler accessDeniedHandler
     ) throws Exception {
         http
                 .csrf(csrf -> csrf
@@ -48,12 +52,21 @@ public class SecurityConfig {
                         .anyRequest()
                         .authenticated()
                 )
+                .exceptionHandling(exception -> exception
+                        // 토큰이 없거나 인증되지 않은 사용자의 보호 API 접근
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        // 인증은 성공했지만, 필요한 권한이 없는 요청
+                        .accessDeniedHandler(accessDeniedHandler)
+                )
                 .oauth2ResourceServer(resourceServer ->
-                        resourceServer.jwt(jwt ->
-                                // 기존 JwtDecoder로 토큰을 검증하고, Claim을 인증 사용자와 권한으로 변환
-                                jwt.jwtAuthenticationConverter(
-                                        jwtAuthenticationConverter
-                                )
+                        resourceServer
+                                // Bearer Token 파싱, 검증 단계의 인증 실패
+                                .authenticationEntryPoint(authenticationEntryPoint)
+                                .accessDeniedHandler(accessDeniedHandler)
+                                .jwt(jwt ->
+                                        jwt.jwtAuthenticationConverter(
+                                                jwtAuthenticationConverter
+                                        )
                         )
                 );
 
