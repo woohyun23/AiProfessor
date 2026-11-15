@@ -9,6 +9,7 @@ import com.aiprofessor.backend.auth.domain.User;
 import com.aiprofessor.backend.support.config.JpaConfig;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -33,7 +34,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 @Import({TestcontainersConfiguration.class, JpaConfig.class})
 class RefreshTokenRepositoryTest {
 
-    private static final Instant REFERENCE_TIME = Instant.now();
+    private static final Instant REFERENCE_TIME = Instant.now()
+            .truncatedTo(ChronoUnit.MICROS);
 
     @Autowired
     private RefreshTokenRepository refreshTokenRepository;
