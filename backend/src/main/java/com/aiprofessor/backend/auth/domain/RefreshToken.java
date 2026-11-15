@@ -119,6 +119,13 @@ public class RefreshToken {
         );
     }
 
+    public void revoke(Instant revokedAt) {
+        this.revokedAt = Objects.requireNonNull(
+                revokedAt,
+                "revokedAt must not be null"
+        );
+    }
+
     private static String validateUserAgent(String userAgent) {
         if (userAgent == null) {
             return null;

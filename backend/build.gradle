@@ -65,5 +65,22 @@ dependencies {
 }
 
 tasks.named('test') {
-	useJUnitPlatform()
+	useJUnitPlatform {
+		excludeTags 'performance'
+	}
+}
+
+tasks.register('performanceTest', Test) {
+	group = 'verification'
+	description = 'Runs performance benchmark tests.'
+
+	testClassesDirs = sourceSets.test.output.classesDirs
+	classpath = sourceSets.test.runtimeClasspath
+
+	useJUnitPlatform {
+		includeTags 'performance'
+	}
+
+	shouldRunAfter tasks.named('test')
+	outputs.upToDateWhen { false }
 }
