@@ -29,7 +29,9 @@ public class JsonAuthenticationEntryPoint implements AuthenticationEntryPoint {
             HttpServletResponse response,
             AuthenticationException exception
     ) throws IOException {
+        // Spring Security 기본 Handler → HTTP 상태와 WWW-Authenticate 헤더 설정 → AiProfessor Writer → 공통 JSON 오류 본문 작성
         // RFC 6750에 맞는 WWW-Authenticate 응답 헤더 유지
+        // WWW-Authenticate 헤더 - 서버가 클라이언트에게 어떤 인증 방식이 필요하며, 인증이 왜 실패했는지 알려주는 HTTP 응답 헤더로, 인증 실패를 표준 방식으로 해석할 수 있도록 제공하는 헤더
         // delegate를 먼저 호출하는 이유 - 직접 JSON만 작성하면 OAuth2 Resource Server의 표준 응답 헤더가 사라질 수 있기 때문
         delegate.commence(request, response, exception);
 
