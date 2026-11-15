@@ -40,7 +40,7 @@ public class CurrentAccountStatusFilter extends OncePerRequestFilter {
     );
 
     private final CurrentAccountStatusValidator accountStatusValidator;
-    private final SecurityErrorResponseWriter responseWriter;
+    private final JsonAuthenticationEntryPoint authenticationEntryPoint;
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
@@ -70,7 +70,8 @@ public class CurrentAccountStatusFilter extends OncePerRequestFilter {
             UUID userId = extractUserId(jwtAuthentication);
             accountStatusValidator.validate(userId);
         } catch (ApiException exception) {
-            responseWriter.write(
+            authenticationEntryPoint.commenceBearerFailure(
+                    request,
                     response,
                     exception.getErrorCode()
             );

@@ -29,7 +29,7 @@ public class SecurityConfig {
 
         CurrentAccountStatusFilter accountStatusFilter = new CurrentAccountStatusFilter(
                 accountStatusValidator,
-                responseWriter
+                authenticationEntryPoint
         );
 
         http

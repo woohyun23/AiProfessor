@@ -210,7 +210,15 @@ class ResourceServerAuthenticationTest {
                         .value("AUTH_0007"))
                 .andExpect(jsonPath("$.message")
                         .value("잠금 처리된 계정입니다."))
-                .andExpect(jsonPath("$.errors").isEmpty());
+                .andExpect(jsonPath("$.errors").isEmpty())
+                .andExpect(header().string(
+                        HttpHeaders.WWW_AUTHENTICATE,
+                        containsString("Bearer")
+                ))
+                .andExpect(header().string(
+                        HttpHeaders.WWW_AUTHENTICATE,
+                        containsString("invalid_token")
+                ));
     }
 
     @Test
@@ -237,7 +245,15 @@ class ResourceServerAuthenticationTest {
                         .value("USER_0002"))
                 .andExpect(jsonPath("$.message")
                         .value("탈퇴 처리된 계정입니다."))
-                .andExpect(jsonPath("$.errors").isEmpty());
+                .andExpect(jsonPath("$.errors").isEmpty())
+                .andExpect(header().string(
+                        HttpHeaders.WWW_AUTHENTICATE,
+                        containsString("Bearer")
+                ))
+                .andExpect(header().string(
+                        HttpHeaders.WWW_AUTHENTICATE,
+                        containsString("invalid_token")
+                ));
     }
 
     @Test
@@ -262,7 +278,15 @@ class ResourceServerAuthenticationTest {
                         .value("AUTH_0002"))
                 .andExpect(jsonPath("$.message")
                         .value("유효하지 않은 Access Token입니다."))
-                .andExpect(jsonPath("$.errors").isEmpty());
+                .andExpect(jsonPath("$.errors").isEmpty())
+                .andExpect(header().string(
+                        HttpHeaders.WWW_AUTHENTICATE,
+                        containsString("Bearer")
+                ))
+                .andExpect(header().string(
+                        HttpHeaders.WWW_AUTHENTICATE,
+                        containsString("invalid_token")
+                ));
     }
 
     @Test
