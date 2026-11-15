@@ -1,13 +1,18 @@
 package com.aiprofessor.backend.auth.security;
 
 import com.aiprofessor.backend.auth.error.AuthErrorCode;
+import com.aiprofessor.backend.support.error.ErrorCode;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.jwt.JwtValidationException;
+import org.springframework.security.oauth2.server.resource.BearerTokenError;
+import org.springframework.security.oauth2.server.resource.BearerTokenErrorCodes;
 import org.springframework.security.oauth2.server.resource.web.BearerTokenAuthenticationEntryPoint;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.stereotype.Component;
@@ -72,6 +77,27 @@ public class JsonAuthenticationEntryPoint implements AuthenticationEntryPoint {
         }
 
         return false;
+    }
+
+    public void commenceBearerFailure(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            ErrorCode errorCode
+    ) throws IOException {
+        BearerTokenError bearerTokenError = new BearerTokenError(
+                BearerTokenErrorCodes.INVALID_TOKEN,
+                HttpStatus.UNAUTHORIZED,
+                null,
+                null
+        );
+
+        delegate.commence(
+                request,
+                response,
+                new OAuth2AuthenticationException(bearerTokenError)
+        );
+
+        responseWriter.write(response, errorCode);
     }
 
 }

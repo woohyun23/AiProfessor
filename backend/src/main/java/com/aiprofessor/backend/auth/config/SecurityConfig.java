@@ -1,13 +1,13 @@
 package com.aiprofessor.backend.auth.config;
 
-import com.aiprofessor.backend.auth.security.JsonAccessDeniedHandler;
-import com.aiprofessor.backend.auth.security.JsonAuthenticationEntryPoint;
+import com.aiprofessor.backend.auth.security.*;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
+import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration(proxyBeanMethods = false)
@@ -22,8 +22,16 @@ public class SecurityConfig {
             HttpSecurity http,
             JwtAuthenticationConverter jwtAuthenticationConverter,
             JsonAuthenticationEntryPoint authenticationEntryPoint,
-            JsonAccessDeniedHandler accessDeniedHandler
+            JsonAccessDeniedHandler accessDeniedHandler,
+            CurrentAccountStatusValidator accountStatusValidator,
+            SecurityErrorResponseWriter responseWriter
     ) throws Exception {
+
+        CurrentAccountStatusFilter accountStatusFilter = new CurrentAccountStatusFilter(
+                accountStatusValidator,
+                authenticationEntryPoint
+        );
+
         http
                 .csrf(csrf -> csrf
                         // 공개 JSON API는 CSRF Token 검사에서 제외
@@ -68,6 +76,10 @@ public class SecurityConfig {
                                                 jwtAuthenticationConverter
                                         )
                         )
+                )
+                .addFilterAfter(
+                        accountStatusFilter,
+                        BearerTokenAuthenticationFilter.class
                 );
 
         return http.build();
