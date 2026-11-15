@@ -1,11 +1,14 @@
 package com.aiprofessor.backend.auth.security;
 
 import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.containsString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -21,12 +24,15 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.jwt.BadJwtException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtValidationException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -37,6 +43,9 @@ import org.springframework.web.bind.annotation.RestController;
 @Import({
         SecurityConfig.class,
         JwtAuthenticationConfig.class,
+        JsonAuthenticationEntryPoint.class,
+        JsonAccessDeniedHandler.class,
+        SecurityErrorResponseWriter.class,
         ResourceServerAuthenticationTest.TestController.class
 })
 class ResourceServerAuthenticationTest {
@@ -59,7 +68,20 @@ class ResourceServerAuthenticationTest {
     void Access_Token이_없으면_보호_API_요청을_거부한다()
             throws Exception {
         mockMvc.perform(get(PROTECTED_PATH))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(
+                        MediaType.APPLICATION_JSON
+                ))
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.errorCode")
+                        .value("AUTH_0008"))
+                .andExpect(jsonPath("$.message")
+                        .value("인증이 필요한 요청입니다."))
+                .andExpect(jsonPath("$.errors").isEmpty())
+                .andExpect(header().string(
+                        HttpHeaders.WWW_AUTHENTICATE,
+                        containsString("Bearer")
+                ));
 
         verifyNoInteractions(jwtDecoder);
     }
@@ -75,9 +97,59 @@ class ResourceServerAuthenticationTest {
                                 HttpHeaders.AUTHORIZATION,
                                 "Bearer invalid-token"
                         ))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(
+                        MediaType.APPLICATION_JSON
+                ))
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.errorCode")
+                        .value("AUTH_0002"))
+                .andExpect(jsonPath("$.message")
+                        .value("유효하지 않은 Access Token입니다."))
+                .andExpect(jsonPath("$.errors").isEmpty())
+                .andExpect(header().string(
+                        HttpHeaders.WWW_AUTHENTICATE,
+                        containsString("invalid_token")
+                ));
 
         verify(jwtDecoder).decode("invalid-token");
+    }
+
+    @Test
+    void 만료된_Access_Token이면_AUTH_0003을_반환한다()
+            throws Exception {
+        OAuth2Error expiredError = new OAuth2Error(
+                "invalid_token",
+                "Jwt expired at 2026-11-11T00:30:00Z",
+                null
+        );
+        given(jwtDecoder.decode("expired-token"))
+                .willThrow(new JwtValidationException(
+                        "Jwt validation failed",
+                        List.of(expiredError)
+                ));
+
+        mockMvc.perform(get(PROTECTED_PATH)
+                        .header(
+                                HttpHeaders.AUTHORIZATION,
+                                "Bearer expired-token"
+                        ))
+                .andExpect(status().isUnauthorized())
+                .andExpect(content().contentTypeCompatibleWith(
+                        MediaType.APPLICATION_JSON
+                ))
+                .andExpect(jsonPath("$.success").value(false))
+                .andExpect(jsonPath("$.errorCode")
+                        .value("AUTH_0003"))
+                .andExpect(jsonPath("$.message")
+                        .value("만료된 Access Token입니다."))
+                .andExpect(jsonPath("$.errors").isEmpty())
+                .andExpect(header().string(
+                        HttpHeaders.WWW_AUTHENTICATE,
+                        containsString("invalid_token")
+                ));
+
+        verify(jwtDecoder).decode("expired-token");
     }
 
     @Test
