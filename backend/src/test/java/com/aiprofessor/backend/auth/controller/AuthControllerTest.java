@@ -21,6 +21,7 @@ import com.aiprofessor.backend.auth.dto.response.LoginUserResponse;
 import com.aiprofessor.backend.auth.error.AuthErrorCode;
 import com.aiprofessor.backend.auth.service.LoginResult;
 import com.aiprofessor.backend.auth.service.LoginService;
+import com.aiprofessor.backend.auth.service.RefreshTokenRotationService;
 import com.aiprofessor.backend.support.error.ApiException;
 import com.aiprofessor.backend.support.error.GlobalExceptionHandler;
 import java.time.Duration;
@@ -51,6 +52,9 @@ class AuthControllerTest {
     @Mock
     private Environment environment;
 
+    @Mock
+    private RefreshTokenRotationService refreshTokenRotationService;
+
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
 
@@ -68,7 +72,8 @@ class AuthControllerTest {
         AuthController authController = new AuthController(
                 loginService,
                 authTokenProperties,
-                environment
+                environment,
+                refreshTokenRotationService
         );
 
         mockMvc = MockMvcBuilders
@@ -93,8 +98,8 @@ class AuthControllerTest {
                 CLIENT_IP,
                 USER_AGENT
         )).willReturn(result);
-        given(environment.matchesProfiles("prod"))
-                .willReturn(false);
+        given(environment.matchesProfiles("local & !prod"))
+                .willReturn(true);
 
         mockMvc.perform(post(LOGIN_PATH)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -149,8 +154,8 @@ class AuthControllerTest {
                 any(String.class),
                 any(String.class)
         )).willReturn(createLoginResult());
-        given(environment.matchesProfiles("prod"))
-                .willReturn(true);
+        given(environment.matchesProfiles("local & !prod"))
+                .willReturn(false);
 
         mockMvc.perform(post(LOGIN_PATH)
                         .contentType(MediaType.APPLICATION_JSON)
