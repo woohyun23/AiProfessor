@@ -43,4 +43,11 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID
             @Param("tokenFamilyId") UUID tokenFamilyId,
             @Param("revokedAt") Instant revokedAt
     );
+
+    @Query("""
+        SELECT refreshToken.tokenFamilyId
+        FROM RefreshToken refreshToken
+        WHERE refreshToken.tokenHash = :tokenHash
+        """)
+    Optional<UUID> findTokenFamilyIdByTokenHash(@Param("tokenHash") String tokenHash);
 }
