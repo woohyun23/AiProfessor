@@ -5,10 +5,7 @@ import com.aiprofessor.backend.auth.dto.request.LoginRequest;
 import com.aiprofessor.backend.auth.dto.response.LoginResponse;
 import com.aiprofessor.backend.auth.dto.response.RefreshResponse;
 import com.aiprofessor.backend.auth.error.AuthErrorCode;
-import com.aiprofessor.backend.auth.service.LoginResult;
-import com.aiprofessor.backend.auth.service.LoginService;
-import com.aiprofessor.backend.auth.service.RefreshRotationResult;
-import com.aiprofessor.backend.auth.service.RefreshTokenRotationService;
+import com.aiprofessor.backend.auth.service.*;
 import com.aiprofessor.backend.support.error.ApiException;
 import com.aiprofessor.backend.support.web.ApiResponse;
 import jakarta.servlet.http.HttpServletRequest;
@@ -19,9 +16,12 @@ import org.springframework.core.env.Environment;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Duration;
+import java.util.UUID;
 
 @RestController
 @RequiredArgsConstructor
@@ -33,6 +33,7 @@ public class AuthController {
     private static final String SAME_SITE_POLICY = "Lax";
 
     private final LoginService loginService;
+    private final LogoutService logoutService;
     private final AuthTokenProperties authTokenProperties;
     private final Environment environment;
     private final RefreshTokenRotationService refreshTokenRotationService;
@@ -107,5 +108,20 @@ public class AuthController {
                         "Access Token을 갱신했습니다.",
                         RefreshResponse.from(result.accessToken())
                 ));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<Void> logout(
+            @AuthenticationPrincipal Jwt jwt,
+            @CookieValue(name = REFRESH_TOKEN_COOKIE_NAME, required = false) String rawRefreshToken
+    ) {
+        UUID authenticatedUserId = UUID.fromString(jwt.getSubject());
+        logoutService.logout(authenticatedUserId, rawRefreshToken);
+
+        return ResponseEntity.noContent()
+                .header(
+                        HttpHeaders.SET_COOKIE,
+                        createRefreshTokenCookie("", Duration.ZERO).toString()
+                ).build();
     }
 }

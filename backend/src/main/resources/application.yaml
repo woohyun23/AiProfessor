@@ -8,6 +8,8 @@ aiprofessor:
   auth:
     refresh:
       allowed-origins: ${AUTH_REFRESH_ALLOWED_ORIGINS:}
+    logout:
+      allowed-origins: ${AUTH_LOGOUT_ALLOWED_ORIGINS:}
     ip-hash-secret: ${AUTH_IP_HASH_SECRET:local-development-ip-hash-secret-change-me}
     token:
       issuer: aiprofessor

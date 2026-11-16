@@ -21,6 +21,7 @@ import com.aiprofessor.backend.auth.security.JsonAccessDeniedHandler;
 import com.aiprofessor.backend.auth.security.JsonAuthenticationEntryPoint;
 import com.aiprofessor.backend.auth.security.SecurityErrorResponseWriter;
 import com.aiprofessor.backend.auth.service.LoginService;
+import com.aiprofessor.backend.auth.service.LogoutService;
 import com.aiprofessor.backend.auth.service.RefreshRotationResult;
 import com.aiprofessor.backend.auth.service.RefreshTokenRotationService;
 import com.aiprofessor.backend.auth.token.IssuedAccessToken;
@@ -71,6 +72,9 @@ class RefreshControllerTest {
 
     @MockitoBean
     private LoginService loginService;
+
+    @MockitoBean
+    private LogoutService logoutService;
 
     @MockitoBean
     private RefreshTokenRotationService rotationService;
