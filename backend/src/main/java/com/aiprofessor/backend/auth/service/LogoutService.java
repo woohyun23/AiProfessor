@@ -26,10 +26,11 @@ public class LogoutService {
         }
 
         String tokenHash = refreshTokenHasher.hash(rawRefreshToken);
-        RefreshToken token = refreshTokenRepository.findByTokenHashForUpdate(tokenHash)
+        RefreshToken token = refreshTokenRepository
+                .findByTokenHashAndUserIdForUpdate(tokenHash, authenticatedUserId)
                 .orElse(null);
 
-        if (token == null || !authenticatedUserId.equals(token.getUser().getId())) {
+        if (token == null) {
             return;
         }
 

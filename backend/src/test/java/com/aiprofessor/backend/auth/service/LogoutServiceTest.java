@@ -34,8 +34,11 @@ import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @DataJpaTest(properties = "spring.jpa.hibernate.ddl-auto=validate")
 @AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
@@ -69,6 +72,9 @@ class LogoutServiceTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     @MockitoBean
     private Clock clock;
@@ -113,13 +119,23 @@ class LogoutServiceTest {
     }
 
     @Test
-    void 다른_사용자의_토큰은_폐기하지_않는다() {
+    void 다른_사용자의_토큰이_잠겨_있어도_로그아웃은_대기하거나_폐기하지_않는다() {
         User authenticatedUser = createUser();
         User owner = createUser();
         String rawToken = "rft_" + UUID.randomUUID();
         RefreshToken otherUsersToken = saveToken(owner, rawToken);
 
-        logoutService.logout(authenticatedUser.getId(), rawToken);
+        TransactionTemplate ownerTransaction = new TransactionTemplate(transactionManager);
+        TransactionTemplate logoutTransaction = new TransactionTemplate(transactionManager);
+        logoutTransaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+
+        ownerTransaction.executeWithoutResult(ownerStatus -> {
+            tokenRepository.findByTokenHashForUpdate(tokenHasher.hash(rawToken)).orElseThrow();
+            logoutTransaction.executeWithoutResult(logoutStatus -> {
+                jdbcTemplate.execute("SET LOCAL lock_timeout = '1s'");
+                logoutService.logout(authenticatedUser.getId(), rawToken);
+            });
+        });
 
         assertThat(loadToken(otherUsersToken).getRevokedAt()).isNull();
     }

@@ -25,6 +25,18 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID
             @Param("tokenHash") String tokenHash
     );
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("""
+            SELECT refreshToken
+            FROM RefreshToken refreshToken
+            WHERE refreshToken.tokenHash = :tokenHash
+              AND refreshToken.user.id = :authenticatedUserId
+            """)
+    Optional<RefreshToken> findByTokenHashAndUserIdForUpdate(
+            @Param("tokenHash") String tokenHash,
+            @Param("authenticatedUserId") UUID authenticatedUserId
+    );
+
     // 같은 Token Family에 속한 활성 토큰 일괄 폐기 -> 반환 값 : 폐기된 토큰 개수
     @Modifying(
             // 벌크 업데이트 전에 영속성 컨텍스트의 변경 사항을 DB에 반영
