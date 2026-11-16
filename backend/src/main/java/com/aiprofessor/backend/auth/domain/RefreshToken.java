@@ -139,4 +139,30 @@ public class RefreshToken {
 
         return userAgent;
     }
+
+    public void replaceWith(RefreshToken replacement, Instant now) {
+        Objects.requireNonNull(replacement, "replacement must not be null");
+
+        if (isRevokedOrReplace() || isExpired(now)) {
+            throw new IllegalStateException("Inactive refresh token cannot be replaced");
+        }
+
+        if (id.equals(replacement.id)
+                || !tokenFamilyId.equals(replacement.tokenFamilyId)
+                || !user.getId().equals(replacement.user.getId())
+        ) {
+            throw new IllegalArgumentException("Replacement must be a different token of the same user and family");
+        }
+
+        revoke(now);
+        this.replacedByTokenId = replacement.id;
+    }
+
+    public boolean isRevokedOrReplace() {
+        return revokedAt != null || replacedByTokenId != null;
+    }
+
+    public boolean isExpired(Instant now) {
+        return !expiresAt.isAfter(now);
+    }
 }
