@@ -21,6 +21,7 @@ import com.aiprofessor.backend.auth.dto.response.LoginUserResponse;
 import com.aiprofessor.backend.auth.error.AuthErrorCode;
 import com.aiprofessor.backend.auth.service.LoginResult;
 import com.aiprofessor.backend.auth.service.LoginService;
+import com.aiprofessor.backend.auth.service.LogoutService;
 import com.aiprofessor.backend.auth.service.RefreshTokenRotationService;
 import com.aiprofessor.backend.support.error.ApiException;
 import com.aiprofessor.backend.support.error.GlobalExceptionHandler;
@@ -50,6 +51,9 @@ class AuthControllerTest {
     private LoginService loginService;
 
     @Mock
+    private LogoutService logoutService;
+
+    @Mock
     private Environment environment;
 
     @Mock
@@ -71,6 +75,7 @@ class AuthControllerTest {
                 );
         AuthController authController = new AuthController(
                 loginService,
+                logoutService,
                 authTokenProperties,
                 environment,
                 refreshTokenRotationService
