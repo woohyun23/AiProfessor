@@ -12,11 +12,14 @@ import com.aiprofessor.backend.auth.token.RefreshTokenGenerator;
 import com.aiprofessor.backend.auth.token.RefreshTokenHasher;
 import com.aiprofessor.backend.support.error.ApiException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -28,21 +31,33 @@ class RefreshTokenRotationService {
     private final AccessTokenGenerator accessTokenGenerator;
     private final AuthTokenProperties authTokenProperties;
     private final Clock clock;
+    private final JdbcTemplate jdbcTemplate;
 
-    @Transactional
+    @Transactional(
+            isolation = Isolation.READ_COMMITTED,
+            // noRollbackFor - 재사용 전용 예외 한 종류에만 적용
+            // -> 폐기 쿼리가 성공한 뒤 이 예외를 던지면 Spring이 폐기를 커밋하고 호출자에게 예외 전달, JWT 서명 실패나 DB 오류는 기존대로 롤백
+            noRollbackFor = RefreshTokenReuseException.class
+    )
     public RefreshRotationResult rotate(String rawRefreshToken) {
         if (rawRefreshToken == null || rawRefreshToken.isBlank()) {
             throw new ApiException(AuthErrorCode.INVALID_REFRESH_TOKEN);
         }
 
         String tokenHash = refreshTokenHasher.hash(rawRefreshToken);
+        UUID tokenFamilyId = refreshTokenRepository.findTokenFamilyIdByTokenHash(tokenHash)
+                .orElseThrow(() -> new ApiException(AuthErrorCode.INVALID_REFRESH_TOKEN));
+
+        lockTokenFamily(tokenFamilyId);
+
         RefreshToken current = refreshTokenRepository.findByTokenHashForUpdate(tokenHash)
                 .orElseThrow(() -> new ApiException(AuthErrorCode.INVALID_REFRESH_TOKEN));
 
         // 잠금을 기다리는 동안 토큰이 만료될 수 있으므로, 잠금 조회가 끝난 뒤의 시각을 확인
         Instant now = clock.instant();
         if (current.isRevokedOrReplace()) {
-            throw new ApiException(AuthErrorCode.INVALID_REFRESH_TOKEN);
+            refreshTokenRepository.revokeActiveByTokenFamily(tokenFamilyId, now);
+            throw new RefreshTokenReuseException();
         }
 
         if (current.isExpired(now)) {
@@ -79,5 +94,12 @@ class RefreshTokenRotationService {
                 accessToken,
                 nextRawToken
         );
+    }
+
+    private void lockTokenFamily(UUID tokenFamilyId) {
+        long lockKey = tokenFamilyId.getMostSignificantBits() ^ tokenFamilyId.getLeastSignificantBits();
+        // 같은 Token Family에서 정ㅇ상 회전과 재사용 탐지가 동시에 진행되지 않도록 하기 위해 pg_advisory_xact_lock(?) 호출
+        // 기존의 findByTokenHashForUpdate()는 요청에 사용된 토큰 한 행을 잠그지만, 사용된 토큰이 서로 달라도 같은 Family라면 한 요청이 끝날 때까지 다음 요청을 대기하도록 잠금
+        jdbcTemplate.queryForObject("SELECT 1 FROM pg_advisory_xact_lock(?)", Integer.class ,lockKey);
     }
 }

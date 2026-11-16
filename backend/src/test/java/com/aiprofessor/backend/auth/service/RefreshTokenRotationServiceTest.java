@@ -20,7 +20,14 @@ import com.aiprofessor.backend.support.error.ApiException;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.CyclicBarrier;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -96,8 +103,8 @@ class RefreshTokenRotationServiceTest {
 
     @AfterEach
     void cleanUp() {
-        jdbcTemplate.update("DELETE FROM refresh_tokens WHERE token_family_id = ?", familyId);
         if (user != null) {
+            jdbcTemplate.update("DELETE FROM refresh_tokens WHERE user_id = ?", user.getId());
             userRepository.deleteById(user.getId());
         }
     }
@@ -105,10 +112,7 @@ class RefreshTokenRotationServiceTest {
     @Test
     void 같은_Family에_새_토큰을_저장하고_기존_토큰을_폐기한다() {
         RefreshToken original = issueOriginal(now.plusSeconds(60));
-        given(jwtEncoder.encode(any())).willReturn(Jwt.withTokenValue("test-access-token")
-                .header("alg", "RS256")
-                .subject(user.getId().toString())
-                .build());
+        stubJwtSigning();
 
         RefreshRotationResult result = rotationService.rotate(rawToken);
 
@@ -125,7 +129,86 @@ class RefreshTokenRotationServiceTest {
         assertThat(replacement.getExpiresAt()).isEqualTo(now.plus(14, ChronoUnit.DAYS));
         assertThat(replacement.getRevokedAt()).isNull();
         assertThat(countFamilyTokens()).isEqualTo(2L);
+    }
 
+    @Test
+    void 교체된_토큰을_재사용하면_오류를_반환하고_교체_토큰의_폐기를_커밋한다() {
+        RefreshToken original = issueOriginal(now.plusSeconds(60));
+        stubJwtSigning();
+        rotationService.rotate(rawToken);
+
+        // 최초 회전과 재사용 시각을 구분해 새 토큰의 폐기 시각만 변경됐는지 확인한다.
+        Instant reuseTime = now.plusSeconds(1);
+        given(clock.instant()).willReturn(reuseTime);
+
+        assertThatThrownBy(() -> rotationService.rotate(rawToken))
+                .isInstanceOfSatisfying(ApiException.class, ex ->
+                        assertThat(ex.getErrorCode()).isEqualTo(AuthErrorCode.REFRESH_TOKEN_REUSED));
+
+        RefreshToken retired = tokenRepository.findById(original.getId()).orElseThrow();
+        RefreshToken replacement = tokenRepository
+                .findById(retired.getReplacedByTokenId()).orElseThrow();
+        assertThat(retired.getRevokedAt()).isEqualTo(now);
+        assertThat(replacement.getRevokedAt()).isEqualTo(reuseTime);
+        assertThat(countFamilyTokens()).isEqualTo(2L);
+    }
+
+    @Test
+    void 같은_토큰을_동시에_갱신하면_한_요청만_성공하고_해당_Family만_폐기한다()
+            throws Exception {
+        RefreshToken original = issueOriginal(now.plusSeconds(60));
+        String otherRawToken = tokenGenerator.generate();
+        RefreshToken otherToken = tokenRepository.saveAndFlush(RefreshToken.issue(
+                user, tokenHasher.hash(otherRawToken), UUID.randomUUID(),
+                now.plusSeconds(60), null, null
+        ));
+        stubJwtSigning();
+
+        CyclicBarrier start = new CyclicBarrier(2);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<RefreshRotationResult> first = executor.submit(() -> {
+                start.await(5, TimeUnit.SECONDS);
+                return rotationService.rotate(rawToken);
+            });
+            Future<RefreshRotationResult> second = executor.submit(() -> {
+                start.await(5, TimeUnit.SECONDS);
+                return rotationService.rotate(rawToken);
+            });
+
+            int successes = 0;
+            int reuseFailures = 0;
+            for (Future<RefreshRotationResult> request : List.of(first, second)) {
+                try {
+                    request.get(10, TimeUnit.SECONDS);
+                    successes++;
+                } catch (ExecutionException ex) {
+                    assertThat(ex.getCause()).isInstanceOfSatisfying(ApiException.class, failure ->
+                            assertThat(failure.getErrorCode())
+                                    .isEqualTo(AuthErrorCode.REFRESH_TOKEN_REUSED));
+                    reuseFailures++;
+                }
+            }
+
+            assertThat(successes).isOne();
+            assertThat(reuseFailures).isOne();
+
+            RefreshToken retired = tokenRepository.findById(original.getId()).orElseThrow();
+            RefreshToken replacement = tokenRepository
+                    .findById(retired.getReplacedByTokenId()).orElseThrow();
+            assertThat(replacement.getRevokedAt()).isEqualTo(now);
+            assertThat(countFamilyTokens()).isEqualTo(2L);
+            assertThat(tokenRepository.findById(otherToken.getId()).orElseThrow().getRevokedAt())
+                    .isNull();
+            assertThat(rotationService.rotate(otherRawToken).refreshToken())
+                    .isNotEqualTo(otherRawToken);
+        } finally {
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void 존재하지_않는_토큰은_유효하지_않은_토큰으로_거부한다() {
         assertThatThrownBy(() -> rotationService.rotate(rawToken))
                 .isInstanceOfSatisfying(ApiException.class, ex ->
                         assertThat(ex.getErrorCode()).isEqualTo(AuthErrorCode.INVALID_REFRESH_TOKEN));
@@ -159,6 +242,13 @@ class RefreshTokenRotationServiceTest {
         return tokenRepository.saveAndFlush(RefreshToken.issue(
                 user, tokenHasher.hash(rawToken), familyId, expiresAt, null, null
         ));
+    }
+
+    private void stubJwtSigning() {
+        given(jwtEncoder.encode(any())).willReturn(Jwt.withTokenValue("test-access-token")
+                .header("alg", "RS256")
+                .subject(user.getId().toString())
+                .build());
     }
 
     private Long countFamilyTokens() {
