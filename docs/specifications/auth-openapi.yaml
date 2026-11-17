@@ -186,8 +186,9 @@ paths:
           description: 비밀번호 변경 완료. 응답 본문 없음.
         '400':
           description: |
-            입력 제약 위반 (COMMON_0001), 읽을 수 없는 요청 본문 (COMMON_0002),
-            현재 비밀번호 불일치 또는 입력이 UTF-8 기준 72바이트 초과 (USER_0003),
+            필수 필드 누락, 공백 입력 또는 새 비밀번호의 길이·UTF-8 72바이트 제한 위반 (COMMON_0001).
+            읽을 수 없는 요청 본문 (COMMON_0002).
+            현재 비밀번호 불일치 또는 currentPassword의 UTF-8 72바이트 제한 위반 (USER_0003).
             현재 비밀번호와 동일한 새 비밀번호 (USER_0004).
           content:
             application/json:

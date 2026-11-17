@@ -231,6 +231,7 @@ Set-Cookie: refresh_token=rft_...; HttpOnly; Secure; SameSite=Lax; Path=/api/v1/
 요청:
 
 ```http
+Origin: http://localhost:5173
 Cookie: refresh_token=rft_...
 ```
 
@@ -281,6 +282,7 @@ Set-Cookie: refresh_token=rft_new...; HttpOnly; Secure; SameSite=Lax; Path=/api/
 요청:
 
 ```http
+Origin: http://localhost:5173
 Authorization: Bearer eyJ...
 Cookie: refresh_token=rft_...
 ```
