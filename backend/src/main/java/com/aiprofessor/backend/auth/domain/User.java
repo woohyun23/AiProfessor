@@ -3,12 +3,15 @@ package com.aiprofessor.backend.auth.domain;
 import com.aiprofessor.backend.support.persistence.BaseEntity;
 import jakarta.persistence.*;
 import lombok.Getter;
+import org.hibernate.annotations.DynamicUpdate;
 
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 
 @Entity
+// DynamicUpdate - Hibernate가 변경된 컬럼만을 Update하여 다른 컬럼의 변경이 덮어써지는 문제 상황 방지
+@DynamicUpdate
 @Getter
 @Table(name = "users")
 public class User extends BaseEntity {
@@ -58,5 +61,9 @@ public class User extends BaseEntity {
 
     public void recordLogin(Instant loginAt) {
         this.lastLoginAt = Objects.requireNonNull(loginAt, "loginAt must not be null");
+    }
+
+    public void changeDisplayName(String displayName) {
+        this.displayName = Objects.requireNonNull(displayName, "displayName must not be null");
     }
 }
