@@ -9,6 +9,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
 
 @Configuration(proxyBeanMethods = false)
 public class SecurityConfig {
@@ -39,6 +40,12 @@ public class SecurityConfig {
                         .ignoringRequestMatchers(
                                 SIGN_UP_PATH,
                                 LOGIN_PATH
+                        )
+                        .ignoringRequestMatchers(
+                                PathPatternRequestMatcher.pathPattern(
+                                        HttpMethod.PATCH,
+                                        "/api/v1/users/me"
+                                )
                         )
                 )
                 .sessionManagement(session -> session
