@@ -42,10 +42,9 @@ public class SecurityConfig {
                                 LOGIN_PATH
                         )
                         .ignoringRequestMatchers(
-                                PathPatternRequestMatcher.pathPattern(
-                                        HttpMethod.PATCH,
-                                        "/api/v1/users/me"
-                                )
+                                PathPatternRequestMatcher.pathPattern(HttpMethod.PATCH, "/api/v1/users/me"),
+                                PathPatternRequestMatcher.pathPattern(HttpMethod.PATCH, "/api/v1/users/me/password")
+
                         )
                 )
                 .sessionManagement(session -> session

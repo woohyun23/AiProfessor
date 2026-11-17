@@ -1,10 +1,12 @@
 package com.aiprofessor.backend.auth.controller;
 
+import com.aiprofessor.backend.auth.dto.request.ChangePasswordRequest;
 import com.aiprofessor.backend.auth.dto.request.SignUpRequest;
 import com.aiprofessor.backend.auth.dto.request.UpdateDisplayNameRequest;
 import com.aiprofessor.backend.auth.dto.response.MyProfileResponse;
 import com.aiprofessor.backend.auth.dto.response.SignUpResponse;
 import com.aiprofessor.backend.auth.service.MyProfileService;
+import com.aiprofessor.backend.auth.service.PasswordChangeService;
 import com.aiprofessor.backend.auth.service.SignUpService;
 import com.aiprofessor.backend.support.web.ApiResponse;
 import jakarta.validation.Valid;
@@ -24,6 +26,7 @@ public class UserController {
 
     private final SignUpService signUpService;
     private final MyProfileService myProfileService;
+    private final PasswordChangeService passwordChangeService;
 
     @PostMapping
     public ResponseEntity<ApiResponse<SignUpResponse>> signUp(
@@ -59,5 +62,16 @@ public class UserController {
                 "표시할 이름을 변경했습니다.",
                 myProfileService.updateMyProfile(userId, request.displayName())
         ));
+    }
+
+    @PatchMapping("/me/password")
+    public ResponseEntity<ApiResponse<Void>> changePassword(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody ChangePasswordRequest request
+    ) {
+        UUID userId = UUID.fromString(jwt.getSubject());
+        passwordChangeService.changePassword(userId, request);
+
+        return ResponseEntity.noContent().build();
     }
 }

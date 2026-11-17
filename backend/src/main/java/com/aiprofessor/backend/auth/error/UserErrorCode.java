@@ -6,7 +6,9 @@ import org.springframework.http.HttpStatus;
 public enum UserErrorCode implements ErrorCode {
 
     EMAIL_ALREADY_EXISTS("USER_0001", "이미 가입된 이메일입니다.", HttpStatus.CONFLICT),
-    ACCOUNT_WITHDRAWN("USER_0002", "탈퇴 처리된 계정입니다.", HttpStatus.UNAUTHORIZED);
+    ACCOUNT_WITHDRAWN("USER_0002", "탈퇴 처리된 계정입니다.", HttpStatus.UNAUTHORIZED),
+    CURRENT_PASSWORD_MISMATCH("USER_0003", "현재 비밀번호가 일치하지 않습니다.", HttpStatus.BAD_REQUEST),
+    SAME_PASSWORD("USER_0004", "새 비밀번호는 현재 비밀번호와 달라야 합니다.", HttpStatus.BAD_REQUEST);
 
     private final String code;
     private final String message;
