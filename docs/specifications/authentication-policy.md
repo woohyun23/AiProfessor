@@ -270,7 +270,7 @@ Access Token은 자체 검증에 성공하더라도 보호 API에서 현재 사�
 - Refresh Token의 사용자가 Access Token의 `sub`와 같은지 검증한다.
 - 현재 Refresh Token만 폐기하고 Cookie를 즉시 만료시킨다.
 - 같은 로그아웃 요청을 반복해도 `204 No Content`를 반환한다.
-- 존재하지 않거나 이미 폐기된 Cookie로 로그아웃해도 토큰 존재 여부를 노출하지 않는다.
+- 인증과 Origin 검사를 통과하면 Cookie가 누락되었거나 토큰이 미등록·만료·폐기 상태이거나 소유자가 달라도 같은 `204 No Content`와 Cookie 만료 헤더를 반환한다. 이 경우 토큰은 변경하지 않는다.
 
 Access Token은 서버에 저장하지 않으므로 로그아웃 후에도 최대 30분 동안 암호학적으로 유효하다. 클라이언트는 로그아웃 성공 즉시 메모리의 Access Token과 사용자 정보를 제거한다.
 
@@ -302,8 +302,8 @@ Access Token은 서버에 저장하지 않으므로 로그아웃 후에도 최�
 Refresh Token은 브라우저가 자동 전송하는 Cookie이므로 CSRF 관점의 보호가 필요하다.
 
 - 운영 환경은 `SameSite=Lax`, `Secure`, Host-only Cookie를 사용한다.
-- 로그인, 갱신, 로그아웃 요청의 `Origin`을 서버 허용 목록과 비교한다.
-- 허용되지 않은 Origin의 Credential 요청을 거부한다.
+- 로그인, 갱신, 로그아웃의 `POST`와 CORS 사전 요청을 각 경로의 Origin 허용 목록과 비교한다. 설정 키는 각각 `AUTH_LOGIN_ALLOWED_ORIGINS`, `AUTH_REFRESH_ALLOWED_ORIGINS`, `AUTH_LOGOUT_ALLOWED_ORIGINS`다.
+- Origin이 누락되었거나 `null`이거나 허용 목록에 없으면 처리 전에 `403 AUTH_0009`를 반환한다. 허용 목록이 비어 있으면 해당 경로의 요청을 거부한다.
 - 상태 변경 요청은 `GET`으로 제공하지 않는다.
 - Bearer Access Token만 사용하는 일반 API는 서버 세션 기반 CSRF 보호 대상이 아니다.
 

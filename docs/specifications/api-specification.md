@@ -5,6 +5,7 @@
 - 기준 문서: `AiProfessor MVP 요구사항 명세서 v0.1`, `테이블 명세서 v0.1`, `인증 및 토큰 정책 v0.1`
 - Base URL: `/api/v1`
 - 용도: Notion 붙여넣기 및 OpenAPI 작성 기준
+- 구현된 인증 API의 기계 판독 명세: [OpenAPI 3.1](./auth-openapi.yaml)
 
 > 공통 응답 포맷과 외부 에러코드 계약은 `api-specification-notion.md`를 정본으로 사용한다. 이 문서의 `DOCUMENT_NOT_READY` 같은 영문 상수는 상세 동작을 설명하기 위한 의미 레이블이며, 외부 응답에서는 `DOCUMENT_0003` 같은 `도메인_0000` 코드를 사용한다.
 
@@ -172,6 +173,8 @@
 
 인증: 불필요
 
+`Origin`이 필요하다. 브라우저가 보낸 Origin은 `AUTH_LOGIN_ALLOWED_ORIGINS`에 등록되어 있어야 한다.
+
 요청:
 
 ```json
@@ -209,8 +212,11 @@ Set-Cookie: refresh_token=rft_...; HttpOnly; Secure; SameSite=Lax; Path=/api/v1/
 
 오류:
 
+- `400 COMMON_0001`: 이메일·비밀번호 입력 검증 실패
 - `401 AUTH_0001` (`INVALID_CREDENTIALS`)
 - `401 AUTH_0007` (`ACCOUNT_LOCKED`)
+- `401 USER_0002` (`ACCOUNT_WITHDRAWN`)
+- `403 AUTH_0009`: Origin 누락, `null` 또는 미허용
 
 > 이메일 존재 여부가 추측되지 않도록 이메일 오류와 비밀번호 오류를 같은 코드로 응답한다.
 
@@ -219,6 +225,8 @@ Set-Cookie: refresh_token=rft_...; HttpOnly; Secure; SameSite=Lax; Path=/api/v1/
 `POST /auth/refresh`
 
 인증: Access Token 불필요, `refresh_token` Cookie 필요
+
+`Origin`이 필요하며 `AUTH_REFRESH_ALLOWED_ORIGINS`의 허용 목록을 사용한다.
 
 요청:
 
@@ -253,15 +261,22 @@ Set-Cookie: refresh_token=rft_new...; HttpOnly; Secure; SameSite=Lax; Path=/api/
 
 오류:
 
-- `401 AUTH_0004` (`INVALID_REFRESH_TOKEN`)
+- `401 AUTH_0004` (`INVALID_REFRESH_TOKEN`): Cookie 누락 또는 유효하지 않은 Refresh Token
 - `401 AUTH_0005` (`REFRESH_TOKEN_EXPIRED`)
 - `401 AUTH_0006` (`REFRESH_TOKEN_REUSED`)
+- `401 AUTH_0007` (`ACCOUNT_LOCKED`)
+- `401 USER_0002` (`ACCOUNT_WITHDRAWN`)
+- `403 AUTH_0009`: Origin 누락, `null` 또는 미허용
+
+`AUTH_0004`~`AUTH_0006` 응답은 기존 `refresh_token` Cookie를 만료시키는 `Set-Cookie` 헤더를 포함한다. 이름과 경로는 발급 시와 같고 `Max-Age=0`을 사용한다.
 
 ## 5.4 로그아웃
 
 `POST /auth/logout`
 
-인증: Access Token과 `refresh_token` Cookie 필요
+인증: Bearer Access Token 필요. 브라우저에 `refresh_token` Cookie가 있으면 함께 전송한다.
+
+`Origin`이 필요하며 `AUTH_LOGOUT_ALLOWED_ORIGINS`의 허용 목록을 사용한다.
 
 요청:
 
@@ -279,6 +294,14 @@ Set-Cookie: refresh_token=; HttpOnly; Secure; SameSite=Lax; Path=/api/v1/auth; M
 ```
 
 > 로그아웃은 현재 Refresh Token을 폐기하고 Cookie를 만료시킨다. Access Token은 최대 30분의 자체 만료 시각까지 유효할 수 있다.
+
+인증과 Origin 검사를 통과하면 Cookie가 없거나 미등록·만료·폐기된 토큰이거나 소유자가 다른 경우에도 동일한 `204`와 Cookie 만료 헤더를 반환한다. 이 경우 토큰은 변경하지 않는다.
+
+오류:
+
+- `401 AUTH_0008`, `AUTH_0002`, `AUTH_0003`: Access Token 누락·무효·만료
+- `401 AUTH_0007`, `USER_0002`: 계정 잠금·탈퇴
+- `403 AUTH_0009`: Origin 누락, `null` 또는 미허용
 
 ## 6. 문서 API
 
@@ -1044,6 +1067,8 @@ Form Data:
 ```
 
 성공: `200 OK`
+
+응답의 `data`에는 내 정보 조회와 같은 필드가 들어가며, `displayName`은 변경된 값이다. 표시 이름이 누락되거나 공백으로만 구성되거나 2~10자 범위를 벗어나면 `400 COMMON_0001`을 반환한다.
 
 ## 12.3 회원 탈퇴
 
