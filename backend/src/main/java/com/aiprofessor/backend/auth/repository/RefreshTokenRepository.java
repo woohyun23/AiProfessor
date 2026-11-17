@@ -74,4 +74,17 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID
         WHERE token.tokenHash = :tokenHash
         """)
     Optional<RotationTarget> findRotationTargetByTokenHash(@Param("tokenHash") String tokenHash);
+
+    @Modifying(flushAutomatically = true)
+    @Query("""
+        UPDATE RefreshToken token
+        SET token.revokedAt = :now
+        WHERE token.user.id = :userId
+        AND token.revokedAt IS NULL
+        AND token.expiresAt > :now
+        """)
+    int revokeActiveByUserId(
+            @Param("userId") UUID userId,
+            @Param("now") Instant now
+    );
 }

@@ -66,4 +66,8 @@ public class User extends BaseEntity {
     public void changeDisplayName(String displayName) {
         this.displayName = Objects.requireNonNull(displayName, "displayName must not be null");
     }
+
+    public void changePasswordHash(String passwordHash) {
+        this.passwordHash = Objects.requireNonNull(passwordHash, "passwordHash must not be null");
+    }
 }
