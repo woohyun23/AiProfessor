@@ -6,6 +6,7 @@ import com.aiprofessor.backend.auth.domain.User;
 import com.aiprofessor.backend.auth.error.AuthErrorCode;
 import com.aiprofessor.backend.auth.error.UserErrorCode;
 import com.aiprofessor.backend.auth.repository.RefreshTokenRepository;
+import com.aiprofessor.backend.auth.repository.UserRepository;
 import com.aiprofessor.backend.auth.token.AccessTokenGenerator;
 import com.aiprofessor.backend.auth.token.IssuedAccessToken;
 import com.aiprofessor.backend.auth.token.RefreshTokenGenerator;
@@ -26,6 +27,7 @@ import java.util.UUID;
 public class RefreshTokenRotationService {
 
     private final RefreshTokenRepository refreshTokenRepository;
+    private final UserRepository userRepository;
     private final RefreshTokenHasher refreshTokenHasher;
     private final RefreshTokenGenerator refreshTokenGenerator;
     private final AccessTokenGenerator accessTokenGenerator;
@@ -44,17 +46,44 @@ public class RefreshTokenRotationService {
             throw new ApiException(AuthErrorCode.INVALID_REFRESH_TOKEN);
         }
 
+//        String tokenHash = refreshTokenHasher.hash(rawRefreshToken);
+//            UUID tokenFamilyId = refreshTokenRepository.findTokenFamilyIdByTokenHash(tokenHash)
+//                    .orElseThrow(() -> new ApiException(AuthErrorCode.INVALID_REFRESH_TOKEN));
+//
+//            lockTokenFamily(tokenFamilyId);
+//
+//            RefreshToken current = refreshTokenRepository.findByTokenHashForUpdate(tokenHash)
+//                    .orElseThrow(() -> new ApiException(AuthErrorCode.INVALID_REFRESH_TOKEN));
+//
+//            if (current.isRevokedOrReplace()) {
+//                refreshTokenRepository.revokeActiveByTokenFamily(tokenFamilyId, now);
+//                throw new RefreshTokenReuseException();
+//            }
+//
+//            if (current.isExpired(now)) {
+//                throw new ApiException(AuthErrorCode.REFRESH_TOKEN_EXPIRED);
+//        }
+
+//        User user = current.getUser();
         String tokenHash = refreshTokenHasher.hash(rawRefreshToken);
-        UUID tokenFamilyId = refreshTokenRepository.findTokenFamilyIdByTokenHash(tokenHash)
+
+        RefreshTokenRepository.RotationTarget target =
+                refreshTokenRepository.findRotationTargetByTokenHash(tokenHash)
+                        .orElseThrow(() -> new ApiException(AuthErrorCode.INVALID_REFRESH_TOKEN));
+
+        User user = userRepository.findByIdForUpdate(target.getUserId())
                 .orElseThrow(() -> new ApiException(AuthErrorCode.INVALID_REFRESH_TOKEN));
 
+        UUID tokenFamilyId = target.getTokenFamilyId();
         lockTokenFamily(tokenFamilyId);
 
-        RefreshToken current = refreshTokenRepository.findByTokenHashForUpdate(tokenHash)
+        RefreshToken current = refreshTokenRepository
+                .findByTokenHashAndUserIdForUpdate(tokenHash, user.getId())
                 .orElseThrow(() -> new ApiException(AuthErrorCode.INVALID_REFRESH_TOKEN));
 
-        // 잠금을 기다리는 동안 토큰이 만료될 수 있으므로, 잠금 조회가 끝난 뒤의 시각을 확인
+        // 잠금을 기다리는 동안 토큰이 만료될 수 있으므로 조회가 끝난 뒤 시간을 읽는다.
         Instant now = clock.instant();
+
         if (current.isRevokedOrReplace()) {
             refreshTokenRepository.revokeActiveByTokenFamily(tokenFamilyId, now);
             throw new RefreshTokenReuseException();
@@ -64,7 +93,6 @@ public class RefreshTokenRotationService {
             throw new ApiException(AuthErrorCode.REFRESH_TOKEN_EXPIRED);
         }
 
-        User user = current.getUser();
         switch (user.getStatus()) {
             case ACTIVE -> { }
             case LOCKED -> throw new ApiException(AuthErrorCode.ACCOUNT_LOCKED);
@@ -98,7 +126,7 @@ public class RefreshTokenRotationService {
 
     private void lockTokenFamily(UUID tokenFamilyId) {
         long lockKey = tokenFamilyId.getMostSignificantBits() ^ tokenFamilyId.getLeastSignificantBits();
-        // 같은 Token Family에서 정ㅇ상 회전과 재사용 탐지가 동시에 진행되지 않도록 하기 위해 pg_advisory_xact_lock(?) 호출
+        // 같은 Token Family에서 정상 회전과 재사용 탐지가 동시에 진행되지 않도록 하기 위해 pg_advisory_xact_lock(?) 호출
         // 기존의 findByTokenHashForUpdate()는 요청에 사용된 토큰 한 행을 잠그지만, 사용된 토큰이 서로 달라도 같은 Family라면 한 요청이 끝날 때까지 다음 요청을 대기하도록 잠금
         jdbcTemplate.queryForObject("SELECT 1 FROM pg_advisory_xact_lock(?)", Integer.class ,lockKey);
     }

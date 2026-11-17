@@ -56,7 +56,7 @@ public class LoginService {
         String normalizedEmail =
                 emailNormalizer.normalize(request.email());
 
-        Optional<User> optionalUser = userRepository.findByEmail(normalizedEmail);
+        Optional<User> optionalUser = userRepository.findByEmailForUpdate(normalizedEmail);
         String passwordHash = optionalUser
                 .map(User::getPasswordHash)
                 .orElse(DUMMY_PASSWORD_HASH);

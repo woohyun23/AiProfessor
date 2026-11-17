@@ -118,7 +118,7 @@ class LoginServiceTest {
                 );
         String longUserAgent = "😀".repeat(501);
 
-        given(userRepository.findByEmail(NORMALIZED_EMAIL))
+        given(userRepository.findByEmailForUpdate(NORMALIZED_EMAIL))
                 .willReturn(Optional.of(user));
         given(passwordEncoder.matches(
                 RAW_PASSWORD,
@@ -185,7 +185,7 @@ class LoginServiceTest {
                 NORMALIZED_EMAIL,
                 RAW_PASSWORD
         );
-        given(userRepository.findByEmail(NORMALIZED_EMAIL))
+        given(userRepository.findByEmailForUpdate(NORMALIZED_EMAIL))
                 .willReturn(Optional.empty());
         given(passwordEncoder.matches(
                 eq(RAW_PASSWORD),
@@ -219,7 +219,7 @@ class LoginServiceTest {
                 NORMALIZED_EMAIL,
                 "wrong-password"
         );
-        given(userRepository.findByEmail(NORMALIZED_EMAIL))
+        given(userRepository.findByEmailForUpdate(NORMALIZED_EMAIL))
                 .willReturn(Optional.of(user));
         given(passwordEncoder.matches(
                 "wrong-password",
@@ -250,7 +250,7 @@ class LoginServiceTest {
                 "status",
                 UserStatus.LOCKED
         );
-        given(userRepository.findByEmail(NORMALIZED_EMAIL))
+        given(userRepository.findByEmailForUpdate(NORMALIZED_EMAIL))
                 .willReturn(Optional.of(user));
         given(passwordEncoder.matches(
                 RAW_PASSWORD,
@@ -281,7 +281,7 @@ class LoginServiceTest {
                 "status",
                 UserStatus.WITHDRAWN
         );
-        given(userRepository.findByEmail(NORMALIZED_EMAIL))
+        given(userRepository.findByEmailForUpdate(NORMALIZED_EMAIL))
                 .willReturn(Optional.of(user));
         given(passwordEncoder.matches(
                 RAW_PASSWORD,
