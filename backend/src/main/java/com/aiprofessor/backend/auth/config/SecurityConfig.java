@@ -37,10 +37,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf
                         // 공개 JSON API는 CSRF Token 검사에서 제외
                         // Cookie를 사용하는 refresh/logout은 별도 요청 보호가 필요하므로 포함
-                        .ignoringRequestMatchers(
-                                SIGN_UP_PATH,
-                                LOGIN_PATH
-                        )
+                        .ignoringRequestMatchers(SIGN_UP_PATH)
                         .ignoringRequestMatchers(
                                 PathPatternRequestMatcher.pathPattern(HttpMethod.PATCH, "/api/v1/users/me"),
                                 PathPatternRequestMatcher.pathPattern(HttpMethod.PATCH, "/api/v1/users/me/password")
@@ -55,12 +52,7 @@ public class SecurityConfig {
                 )
                 .authorizeHttpRequests(authorize -> authorize
                         // 회원가입과 로그인은 Access Token 없이 접근
-                        .requestMatchers(
-                                HttpMethod.POST,
-                                SIGN_UP_PATH,
-                                LOGIN_PATH
-                        )
-                        .permitAll()
+                        .requestMatchers(HttpMethod.POST, SIGN_UP_PATH).permitAll()
                         .requestMatchers("/actuator/health")
                         .permitAll()
                         .anyRequest()
