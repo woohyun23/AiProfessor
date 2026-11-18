@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.aiprofessor.backend.auth.config.JwtAuthenticationConfig;
+import com.aiprofessor.backend.auth.config.RefreshSecurityConfig;
 import com.aiprofessor.backend.auth.config.SecurityConfig;
 import com.aiprofessor.backend.auth.domain.User;
 import com.aiprofessor.backend.auth.domain.UserStatus;
@@ -44,9 +45,13 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-@WebMvcTest(ResourceServerAuthenticationTest.TestController.class)
+@WebMvcTest(
+        controllers = ResourceServerAuthenticationTest.TestController.class,
+        properties = "aiprofessor.auth.login.allowed-origins=https://app.example.test"
+)
 @Import({
         SecurityConfig.class,
+        RefreshSecurityConfig.class,
         JwtAuthenticationConfig.class,
         JsonAuthenticationEntryPoint.class,
         JsonAccessDeniedHandler.class,
@@ -290,20 +295,17 @@ class ResourceServerAuthenticationTest {
     }
 
     @Test
-    void 로그인_API는_Access_Token이_있어도_계정_상태를_조회하지_않는다()
+    void 로그인_API는_Access_Token이_있어도_JWT와_계정_상태를_조회하지_않는다()
             throws Exception {
-        given(jwtDecoder.decode("public-api-token"))
-                .willReturn(createJwt("USER"));
-
         mockMvc.perform(post(LOGIN_PATH)
+                        .header(HttpHeaders.ORIGIN, "https://app.example.test")
                         .header(
                                 HttpHeaders.AUTHORIZATION,
                                 "Bearer public-api-token"
                         ))
                 .andExpect(status().isNoContent());
 
-        verify(jwtDecoder).decode("public-api-token");
-        verifyNoInteractions(userRepository);
+        verifyNoInteractions(jwtDecoder, userRepository);
     }
 
     private Jwt createJwt(String role) {

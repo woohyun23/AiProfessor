@@ -1,0 +1,432 @@
+openapi: 3.1.0
+info:
+  title: AiProfessor 인증 API
+  version: 0.1.0
+  description: |
+    구현된 회원가입, 로그인, 토큰 갱신, 로그아웃, 본인 정보 및 비밀번호 변경 API를 정의한다.
+    브라우저는 로그인·갱신·로그아웃 요청의 Origin을 생성하고, Refresh Token Cookie를 관리한다.
+    교차 Origin 요청은 서버 허용 목록을 사용하며, 클라이언트는 Cookie 처리가 필요한 요청에 credentials를 포함한다.
+servers:
+  - url: /api/v1
+tags:
+  - name: Auth
+    description: 로그인, 토큰 갱신 및 현재 세션 로그아웃
+  - name: User
+    description: 회원가입, 본인 정보 조회·수정 및 비밀번호 변경
+paths:
+  /users:
+    post:
+      tags: [User]
+      operationId: signUp
+      summary: 이메일과 비밀번호로 회원가입
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignUpRequest'
+      responses:
+        '201':
+          description: 회원가입 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SignUpResponse'
+        '400':
+          $ref: '#/components/responses/InvalidJsonRequest'
+        '409':
+          description: 중복 이메일 (USER_0001)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      summary: 로그인하고 Refresh Token Cookie 발급
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/Origin'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 로그인 성공
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/IssuedRefreshCookie'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          $ref: '#/components/responses/InvalidJsonRequest'
+        '401':
+          description: 자격 증명 불일치 (AUTH_0001), 잠금 (AUTH_0007) 또는 탈퇴 (USER_0002)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/OriginDenied'
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      operationId: refreshAccessToken
+      summary: Refresh Token을 회전하고 Access Token 재발급
+      description: 재사용이 감지되면 같은 Token Family의 활성 Refresh Token을 폐기한다.
+      security:
+        - refreshCookie: []
+      parameters:
+        - $ref: '#/components/parameters/Origin'
+      responses:
+        '200':
+          description: 갱신 성공
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/IssuedRefreshCookie'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RefreshResponse'
+        '401':
+          description: |
+            Cookie 누락·무효 (AUTH_0004), 만료 (AUTH_0005), 재사용 (AUTH_0006),
+            계정 잠금 (AUTH_0007) 또는 탈퇴 (USER_0002).
+            AUTH_0004~AUTH_0006에서만 Cookie 만료 헤더를 반환한다.
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/ExpiredRefreshCookie'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/OriginDenied'
+  /auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      summary: 현재 로그인 세션의 Refresh Token 폐기
+      description: |
+        Cookie의 토큰을 본인 소유일 때만 폐기한다. 인증과 Origin 검사를 통과하면 Cookie가
+        없거나 토큰이 미등록·만료·폐기 상태이거나 소유자가 달라도 동일한 204를 반환한다.
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Origin'
+        - name: refresh_token
+          in: cookie
+          required: false
+          schema:
+            type: string
+      responses:
+        '204':
+          description: 로그아웃 완료. 응답 본문 없음.
+          headers:
+            Set-Cookie:
+              $ref: '#/components/headers/ExpiredRefreshCookie'
+        '401':
+          $ref: '#/components/responses/BearerUnauthorized'
+        '403':
+          $ref: '#/components/responses/OriginDenied'
+  /users/me:
+    get:
+      tags: [User]
+      operationId: getMyProfile
+      summary: 인증된 사용자의 본인 정보 조회
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/MyProfile'
+        '401':
+          $ref: '#/components/responses/BearerUnauthorized'
+    patch:
+      tags: [User]
+      operationId: updateMyProfile
+      summary: 본인의 표시 이름 변경
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDisplayNameRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/MyProfile'
+        '400':
+          $ref: '#/components/responses/InvalidJsonRequest'
+        '401':
+          $ref: '#/components/responses/BearerUnauthorized'
+  /users/me/password:
+    patch:
+      tags: [User]
+      operationId: changePassword
+      summary: 비밀번호 변경 및 본인의 모든 활성 Refresh Token 폐기
+      description: 두 변경은 한 트랜잭션에서 처리한다. 이미 발급된 Access Token은 자체 만료 시각까지 유효할 수 있다.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '204':
+          description: 비밀번호 변경 완료. 응답 본문 없음.
+        '400':
+          description: |
+            필수 필드 누락, 공백 입력 또는 새 비밀번호의 길이·UTF-8 72바이트 제한 위반 (COMMON_0001).
+            읽을 수 없는 요청 본문 (COMMON_0002).
+            현재 비밀번호 불일치 또는 currentPassword의 UTF-8 72바이트 제한 위반 (USER_0003).
+            현재 비밀번호와 동일한 새 비밀번호 (USER_0004).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/BearerUnauthorized'
+        '415':
+          description: 지원하지 않는 요청 미디어 타입 (COMMON_0004)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    refreshCookie:
+      type: apiKey
+      in: cookie
+      name: refresh_token
+      description: 로그인 또는 갱신 응답에서 브라우저가 저장한 HttpOnly Cookie.
+  parameters:
+    Origin:
+      name: Origin
+      in: header
+      required: true
+      description: 브라우저가 생성하는 출처. 로그인·갱신·로그아웃은 각 경로의 허용 목록을 사용한다.
+      schema:
+        type: string
+      example: http://localhost:5173
+  headers:
+    IssuedRefreshCookie:
+      description: Refresh Token Cookie. 운영에서는 Secure를 적용하며 로컬 HTTP 개발 프로필에서는 생략한다. Max-Age는 Refresh Token TTL이다.
+      schema:
+        type: string
+      example: 'refresh_token=rft_example; Path=/api/v1/auth; Max-Age=1209600; Secure; HttpOnly; SameSite=Lax'
+    ExpiredRefreshCookie:
+      description: 발급 때와 동일한 이름·경로를 사용하고 Max-Age=0으로 만료시킨다.
+      schema:
+        type: string
+      example: 'refresh_token=; Path=/api/v1/auth; Max-Age=0; Secure; HttpOnly; SameSite=Lax'
+  responses:
+    InvalidJsonRequest:
+      description: 요청 입력 검증 실패 (COMMON_0001) 또는 읽을 수 없는 요청 본문 (COMMON_0002)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    BearerUnauthorized:
+      description: Access Token 누락 (AUTH_0008)·무효 (AUTH_0002)·만료 (AUTH_0003), 계정 잠금 (AUTH_0007) 또는 탈퇴 (USER_0002)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    OriginDenied:
+      description: Origin이 누락됐거나 null이거나 허용 목록에 없어서 처리 전에 거부했다 (AUTH_0009).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    MyProfile:
+      description: 현재 사용자 정보
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MyProfileResponse'
+  schemas:
+    Email:
+      type: string
+      format: email
+      maxLength: 320
+    DisplayName:
+      type: string
+      minLength: 2
+      maxLength: 10
+      description: 공백만으로 구성할 수 없다.
+      example: 학습자
+    Password:
+      type: string
+      format: password
+      writeOnly: true
+      description: 공백만으로 구성할 수 없다. 서버에서 Java 문자열 길이 8~20자를 검증하고 앞뒤 공백은 보존한다.
+    NewPassword:
+      allOf:
+        - $ref: '#/components/schemas/Password'
+      description: 가입 및 변경에서는 BCrypt 입력인 UTF-8 72바이트 제한도 적용한다.
+    SignUpRequest:
+      type: object
+      required: [email, password, displayName]
+      properties:
+        email:
+          $ref: '#/components/schemas/Email'
+        password:
+          $ref: '#/components/schemas/NewPassword'
+        displayName:
+          $ref: '#/components/schemas/DisplayName'
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          $ref: '#/components/schemas/Email'
+        password:
+          $ref: '#/components/schemas/Password'
+    UpdateDisplayNameRequest:
+      type: object
+      required: [displayName]
+      properties:
+        displayName:
+          $ref: '#/components/schemas/DisplayName'
+    ChangePasswordRequest:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword:
+          type: string
+          format: password
+          writeOnly: true
+          description: 공백만으로 구성할 수 없으며 기존 비밀번호와 일치해야 한다.
+        newPassword:
+          $ref: '#/components/schemas/NewPassword'
+    UserIdentity:
+      type: object
+      required: [userId, email, displayName]
+      properties:
+        userId:
+          type: string
+          format: uuid
+        email:
+          $ref: '#/components/schemas/Email'
+        displayName:
+          $ref: '#/components/schemas/DisplayName'
+    Role:
+      type: string
+      enum: [USER, ADMIN]
+    SignUpData:
+      allOf:
+        - $ref: '#/components/schemas/UserIdentity'
+        - type: object
+          required: [createdAt]
+          properties:
+            createdAt:
+              type: string
+              format: date-time
+    MyProfileData:
+      allOf:
+        - $ref: '#/components/schemas/SignUpData'
+        - type: object
+          required: [role]
+          properties:
+            role:
+              $ref: '#/components/schemas/Role'
+    LoginUser:
+      allOf:
+        - $ref: '#/components/schemas/UserIdentity'
+        - type: object
+          required: [role]
+          properties:
+            role:
+              $ref: '#/components/schemas/Role'
+    AccessTokenData:
+      type: object
+      required: [accessToken, tokenType, expiresIn]
+      properties:
+        accessToken:
+          type: string
+        tokenType:
+          type: string
+          const: Bearer
+        expiresIn:
+          type: integer
+          format: int64
+          description: Access Token 유효기간(초)
+          example: 1800
+    LoginData:
+      allOf:
+        - $ref: '#/components/schemas/AccessTokenData'
+        - type: object
+          required: [user]
+          properties:
+            user:
+              $ref: '#/components/schemas/LoginUser'
+    SuccessEnvelope:
+      type: object
+      required: [success, message, data]
+      properties:
+        success:
+          type: boolean
+          const: true
+        message:
+          type: string
+        data:
+          type: object
+    SignUpResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - properties:
+            data:
+              $ref: '#/components/schemas/SignUpData'
+    LoginResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - properties:
+            data:
+              $ref: '#/components/schemas/LoginData'
+    RefreshResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - properties:
+            data:
+              $ref: '#/components/schemas/AccessTokenData'
+    MyProfileResponse:
+      allOf:
+        - $ref: '#/components/schemas/SuccessEnvelope'
+        - properties:
+            data:
+              $ref: '#/components/schemas/MyProfileData'
+    ErrorResponse:
+      type: object
+      required: [success, errorCode, message, errors]
+      properties:
+        success:
+          type: boolean
+          const: false
+        errorCode:
+          type: string
+        message:
+          type: string
+        errors:
+          type: array
+          items:
+            type: object
+            required: [field, message]
+            properties:
+              field:
+                type: string
+              message:
+                type: string
